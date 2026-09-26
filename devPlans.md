@@ -211,3 +211,158 @@ API routes:       10 server-side route handlers under /api/
 Env vars needed:  NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
                   SUPABASE_SERVICE_ROLE_KEY, HOST_TOKEN_SALT (optional)
 ```
+
+---
+
+## 7  Step-by-Step Vercel Deployment Guide
+
+This guide walks you through deploying ROT8 to [Vercel](https://vercel.com) with a [Supabase](https://supabase.com) backend from scratch.
+
+### 7.1 Prerequisites
+1. A **Supabase account & project** ([supabase.com](https://supabase.com))
+2. A **GitHub account** ([github.com](https://github.com))
+3. A **Vercel account** ([vercel.com](https://vercel.com)) linked to your GitHub
+4. Node.js 18+ and Git installed locally
+
+---
+
+### 7.2 Step 1: Run Supabase Database Migrations
+
+Before deploying the frontend, ensure your Supabase database has all 8 schema migrations applied:
+
+1. Open your **Supabase Dashboard** -> select your project.
+2. Go to the **SQL Editor** tab (left sidebar).
+3. If this is a fresh database, run the SQL files in `supabase/migrations/` sequentially:
+   - `001_initial_schema.sql` (Tables: sessions, courts, matches, players, locked_pairs)
+   - `002_rls_policies.sql` (Row-Level Security)
+   - `003_pair_lock_requests.sql` (Pair lock requests table)
+   - `004_concurrency_functions.sql` (Atomic player claim & release functions)
+   - `005_fix_rls_history.sql` (History archive access)
+   - `006_allow_zero_static_rating.sql` (Unrated player rating constraint)
+   - `007_add_needs_attention_status.sql` (Adds `needs_attention` to `court_status` enum)
+   - `008_restrict_sessions_rls.sql` (Creates `sessions_public` view & hides `host_token_hash` from anon reads)
+
+> [!IMPORTANT]
+> If you already have an existing database that has migrations 001–006, you only need to run **`007_add_needs_attention_status.sql`** and **`008_restrict_sessions_rls.sql`**.
+
+4. **Verify Realtime is enabled:**
+   - In Supabase, navigate to **Database** -> **Publications**.
+   - Select **`supabase_realtime`**.
+   - Ensure the following tables are toggled **ON**:
+     - `sessions`
+     - `courts`
+     - `matches`
+     - `players`
+     - `locked_pairs`
+     - `pair_lock_requests`
+
+---
+
+### 7.3 Step 2: Push Your Code to GitHub
+
+1. Open your terminal in the project directory (`c:\Users\Admin\Desktop\ROT8`).
+2. Verify that `.gitignore` ignores your local secrets file:
+   ```bash
+   git status
+   ```
+   *Make sure `.env.local` is **never** listed as an untracked or staged file.*
+3. Initialize git (if not already done), commit, and push:
+   ```bash
+   git init
+   git add .
+   git commit -m "feat: ROT8 production release"
+   git branch -M main
+   git remote add origin https://github.com/<your-username>/rot8.git
+   git push -u origin main
+   ```
+
+---
+
+### 7.4 Step 3: Deploy via Vercel Web Dashboard (Recommended)
+
+1. Go to [vercel.com/new](https://vercel.com/new).
+2. Under **Import Git Repository**, find your `rot8` repo and click **Import**.
+3. In the **Configure Project** screen:
+   - **Project Name:** `rot8` (or your preferred name)
+   - **Framework Preset:** `Next.js` (automatically detected)
+   - **Root Directory:** `./`
+   - **Build Command:** `next build` (default)
+   - **Output Directory:** `.next` (default)
+   - **Install Command:** `npm install` (default)
+4. Expand the **Environment Variables** section and add the following 3 required variables:
+
+| Variable Name | Required | Where to Find in Supabase | Description |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Project Settings -> API -> Project URL | e.g. `https://xyzcompany.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Project Settings -> API -> `anon` `public` key | Safe for browser client queries |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Project Settings -> API -> `service_role` `secret` key | Used exclusively by server route handlers to bypass RLS |
+| `HOST_TOKEN_SALT` | Optional | Custom random string | Salt used for HMAC-SHA256 host token hashing |
+
+> [!CAUTION]
+> `SUPABASE_SERVICE_ROLE_KEY` must **never** be prefixed with `NEXT_PUBLIC_`. It is a server secret that allows backend administrative operations (such as completing matches and updating player stats) to bypass RLS.
+
+5. Click **Deploy**.
+6. Vercel will build your project using Turbopack and deploy your serverless route handlers and static pages in ~1–2 minutes.
+
+---
+
+### 7.5 Alternative: Deploy via Vercel CLI
+
+If you prefer deploying directly from your command line:
+
+1. Install the Vercel CLI (or run via npx):
+   ```bash
+   npm i -g vercel
+   ```
+2. Log in and link the project:
+   ```bash
+   vercel login
+   vercel link
+   ```
+3. Set your production environment variables:
+   ```bash
+   vercel env add NEXT_PUBLIC_SUPABASE_URL production
+   vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+   vercel env add SUPABASE_SERVICE_ROLE_KEY production
+   vercel env add HOST_TOKEN_SALT production
+   ```
+4. Deploy to production:
+   ```bash
+   vercel --prod
+   ```
+
+---
+
+### 7.6 Step 4: Post-Deployment Smoke Test & Verification
+
+Once Vercel gives you your production URL (e.g. `https://rot8-pickleball.vercel.app`):
+
+1. **Home Page (`/`)**:
+   - Verify page loads with custom typography (Inter + JetBrains Mono) without any layout shifts or console errors.
+2. **Session Creation**:
+   - Click **Start Session**, enter a session name (e.g. "Friday Night Open Play") and court count (e.g. 2).
+   - Verify you are redirected to `/admin/[sessionId]`.
+   - Check that the `rot8_host_token` cookie is securely stored in your browser (Application -> Cookies).
+3. **Queue & Court Management**:
+   - In the Admin console, add 4 or 8 players using Quick Add or Bulk Import.
+   - Click **Fill On-Deck Slots** — verify match previews appear.
+   - Click **Call to Court** — verify players move to `summoned` and court becomes active.
+   - Click **Start Match** -> **Complete Match** (enter score e.g. 11-9) -> verify players re-queue and ratings update.
+4. **TV Kiosk Display (`/kiosk/[sessionId]`)**:
+   - Open `/kiosk/[sessionId]` in a second browser window (or full-screen TV view).
+   - Trigger a state change in the Admin window — verify the Kiosk window updates within 150ms via Realtime without manual refresh.
+5. **Mobile Player Live Hub (`/live/[sessionId]`)**:
+   - Open the live link on a mobile device or inspect with device emulation.
+   - Test self-service check-in with player PIN.
+
+---
+
+### 7.7 Troubleshooting & Common Gotchas
+
+| Symptom | Cause | Solution |
+|---|---|---|
+| **API routes return 500 error on match completion or player add** | Missing or incorrect `SUPABASE_SERVICE_ROLE_KEY` in Vercel | Check Vercel Project Settings -> Environment Variables. Ensure `SUPABASE_SERVICE_ROLE_KEY` is set to the secret service role key (not the anon key). Redeploy after saving. |
+| **Realtime updates not reflecting on Kiosk or Live view** | Realtime publication disabled in Supabase | In Supabase Dashboard -> Database -> Publications -> `supabase_realtime`, verify tables `sessions`, `courts`, `matches`, `players` are enabled. |
+| **Permission denied for relation `sessions` or column `host_token_hash`** | Migration 008 was not applied or client query still requests `*` | Run `supabase/migrations/008_restrict_sessions_rls.sql` in Supabase SQL editor. |
+| **Admin page redirects to login immediately** | Browser blocking HttpOnly cookies or accessing across mismatched domains | Ensure you access the app via HTTPS on the exact domain where the session was created. Check cookie settings in browser. |
+| **Supabase Realtime disconnects on free tier** | Supabase free tier connection limit (200 concurrent clients) | For venues with large crowds, upgrade to Supabase Pro or rely on the built-in 10–15s polling safety net. |

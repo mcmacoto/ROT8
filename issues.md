@@ -35,3 +35,18 @@
   - Fixed root cause where `staged_match_id` was previously not cleared to `null` during `complete_match` in `route.ts` and `forfeit.ts`.
   - Both `route.ts` and `forfeit.ts` now explicitly update players with: `status: 'queued'`, `staged_match_id: null`, and `wait_started_at: now`.
   - Players immediately appear in the off-court queue and are eligible to be drafted for subsequent rotations.
+
+---
+
+### ✅ #5. Vercel deployment fails during `npm install` with `npm error ERESOLVE could not resolve`
+- **Status:** Resolved
+- **Root Cause:**
+  - `package.json` defined `"@types/node": "^20"`.
+  - `vitest@5.0.1` specifies a peer dependency `peerOptional @types/node@"^22.0.0 || >=24.0.0"`.
+  - npm 7+ strictly validates peer dependencies during `npm install`, causing Vercel's build machine to exit with code 1 (`ERESOLVE`).
+- **Fix:**
+  - Upgraded `@types/node` in `package.json` from `"^20"` to `"^22"` (satisfies both `vite@^8.3.0` and `vitest@^5.0.1`).
+  - Ran `npm install` to update `package-lock.json` with resolved dependencies.
+  - Verified `vitest run` (70 tests pass) and `next build` (clean Turbopack compilation).
+  - Push commit with updated `package.json` and `package-lock.json` to GitHub to trigger successful Vercel build.
+
