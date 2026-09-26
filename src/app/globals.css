@@ -1,0 +1,267 @@
+/* ROT8 Pickleball Court & Queue Management System Design System */
+
+:root {
+  /* Warm Light Palette (Admin / Mobile) */
+  --color-cream: #F5F0E8;
+  --color-cream-light: #FAF7F2;
+  --color-cream-dark: #ECE5DA;
+  --color-olive: #8A9A5B;
+  --color-olive-dark: #6D7B43;
+  --color-olive-light: #EBF0E1;
+  --color-terracotta: #C36F42;
+  --color-terracotta-dark: #A4572E;
+  --color-terracotta-light: #F9EFEA;
+  --color-umber: #3E2F23;
+  --color-umber-muted: rgba(62, 47, 35, 0.65);
+  --color-umber-subtle: rgba(62, 47, 35, 0.35);
+  --color-alert: #F09595;
+  --color-alert-dark: #D44242;
+  --color-alert-light: #FDF2F2;
+
+  /* Semantic Variables (Default: Light Theme for Admin & Mobile) */
+  --bg-app: var(--color-cream);
+  --bg-surface: #FFFFFF;
+  --bg-surface-secondary: var(--color-cream-light);
+  --bg-surface-hover: var(--color-cream-dark);
+  --border-color: rgba(62, 47, 35, 0.12);
+  --border-focus: var(--color-terracotta);
+  --text-primary: var(--color-umber);
+  --text-secondary: var(--color-umber-muted);
+  --text-tertiary: var(--color-umber-subtle);
+
+  /* Primary Accent Colors */
+  --color-primary-action: var(--color-terracotta);
+  --color-primary-action-hover: var(--color-terracotta-dark);
+  --color-active-state: var(--color-olive);
+
+  /* Shadows & Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 3px rgba(62, 47, 35, 0.08);
+  --shadow-md: 0 4px 12px rgba(62, 47, 35, 0.08);
+  --shadow-lg: 0 8px 24px rgba(62, 47, 35, 0.12);
+
+  /* Fonts */
+  --font-sans: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+}
+
+/* Dark Theme (TV Kiosk Board) */
+[data-theme='kiosk'], .kiosk-theme {
+  --bg-app: #0D0D0C;
+  --bg-surface: #161614;
+  --bg-surface-secondary: #1E1E1B;
+  --bg-surface-hover: #262623;
+  --border-color: rgba(245, 240, 232, 0.15);
+  --text-primary: #F5F0E8;
+  --text-secondary: rgba(245, 240, 232, 0.7);
+  --text-tertiary: rgba(245, 240, 232, 0.4);
+  --color-primary-action: #C36F42;
+  --color-active-state: #8A9A5B;
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  min-height: 100%;
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* On-Deck Slot Distinctive Dashed Border (Spec Requirement) */
+.on-deck-border {
+  border: 2px dashed var(--color-terracotta) !important;
+}
+
+/* Common Utility Classes */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-olive {
+  background-color: var(--color-olive-light);
+  color: var(--color-olive-dark);
+}
+
+.badge-terracotta {
+  background-color: var(--color-terracotta-light);
+  color: var(--color-terracotta-dark);
+}
+
+.badge-alert {
+  background-color: var(--color-alert-light);
+  color: var(--color-alert-dark);
+}
+
+.kiosk-theme .badge-olive {
+  background-color: rgba(138, 154, 91, 0.2);
+  color: #A3B373;
+  border: 1px solid rgba(138, 154, 91, 0.4);
+}
+
+.kiosk-theme .badge-terracotta {
+  background-color: rgba(195, 111, 66, 0.2);
+  color: #E2895B;
+  border: 1px solid rgba(195, 111, 66, 0.4);
+}
+
+.kiosk-theme .badge-alert {
+  background-color: rgba(240, 149, 149, 0.2);
+  color: #F09595;
+  border: 1px solid rgba(240, 149, 149, 0.4);
+}
+
+/* Responsive Grid & Layout Utilities */
+.responsive-grid-courts,
+.responsive-grid-ondeck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.responsive-grid-queue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.kiosk-grid-courts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.admin-header {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid rgba(62, 47, 35, 0.12);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.kiosk-container {
+  min-height: 100vh;
+  background-color: #0D0D0C;
+  color: #F5F0E8;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kiosk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid rgba(245, 240, 232, 0.15);
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+}
+
+/* Media Query: Tablets & Mobile (max-width: 1024px) */
+@media (max-width: 1024px) {
+  .admin-main {
+    padding: 20px 16px 48px;
+  }
+  .kiosk-container {
+    padding: 20px;
+  }
+}
+
+/* Media Query: Small Tablets & Phones (max-width: 768px) */
+@media (max-width: 768px) {
+  .responsive-grid-queue {
+    grid-template-columns: 1fr;
+  }
+  .kiosk-grid-courts {
+    grid-template-columns: 1fr;
+  }
+  .kiosk-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .kiosk-header h1 {
+    font-size: 1.8rem !important;
+  }
+}
+
+/* Media Query: Mobile Devices (max-width: 640px) */
+@media (max-width: 640px) {
+  .admin-header {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .admin-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .admin-header-actions button,
+  .admin-header-actions a {
+    font-size: 0.8rem !important;
+    padding: 6px 10px !important;
+  }
+  .admin-main {
+    padding: 14px 12px 48px;
+  }
+  .responsive-grid-courts,
+  .responsive-grid-ondeck {
+    grid-template-columns: 1fr;
+  }
+  .kiosk-container {
+    padding: 14px;
+  }
+}
+
