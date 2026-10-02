@@ -139,10 +139,7 @@ export default function KioskBoardPage({
   }
 
   const playersMap = new Map<string, Player>(players.map((p) => [p.id, p]));
-  const courtMatchesMap = new Map<string, Match>();
-  for (const m of matches) {
-    if (m.court_id) courtMatchesMap.set(m.court_id, m);
-  }
+  const matchesMap = new Map<string, Match>(matches.map((m) => [m.id, m]));
 
   const onDeckMatches = matches
     .filter((m) => m.stage === 'on_deck')
@@ -222,7 +219,7 @@ export default function KioskBoardPage({
             <CourtCard
               key={court.id}
               court={court}
-              match={courtMatchesMap.get(court.id) || null}
+              match={court.current_match_id ? matchesMap.get(court.current_match_id) || null : null}
               playersMap={playersMap}
               nowMs={nowMs}
             />
@@ -232,7 +229,7 @@ export default function KioskBoardPage({
         {/* Lower Section: Up-Next On-Deck & General Queue + Live Leaderboard */}
         <section style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid rgba(245, 240, 232, 0.1)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <OnDeckPreview onDeckMatches={onDeckMatches} playersMap={playersMap} />
-          <div style={{ display: 'grid', gridTemplateColumns: queuedPlayers.length > 0 && matches.some((m) => m.stage === 'completed') ? 'repeat(auto-fit, minmax(360px, 1fr))' : '1fr', gap: '24px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: queuedPlayers.length > 0 && matches.some((m) => m.stage === 'completed') ? 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))' : '1fr', gap: '24px', alignItems: 'start' }}>
             <KioskQueue queuedPlayers={queuedPlayers} nowMs={nowMs} />
             {matches.some((m) => m.stage === 'completed') && (
               <KioskLeaderboard session={session} players={players} matches={matches} />

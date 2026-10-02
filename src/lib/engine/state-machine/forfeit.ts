@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { calculateEloUpdates } from '../matchmaking/elo-rated';
 import { triggerAutoDispatchIfEligible } from '../auto-dispatch';
+import { syncLockedPairsElo } from '../locked-pair-dissolution';
 
 export interface ForfeitParams {
   sessionId: string;
@@ -103,6 +104,7 @@ export async function executeMatchForfeit(params: ForfeitParams) {
       ),
     ];
     await Promise.all(playerUpdates);
+    await syncLockedPairsElo(sessionId, [...match.team_a_ids, ...match.team_b_ids]);
   } else {
     // Scores disabled - record match counts, win/loss, and return to queue in parallel
     const playerUpdates = [

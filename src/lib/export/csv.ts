@@ -1,4 +1,4 @@
-import { Match, Player } from '@/types/database';
+import { Match, Player, Court } from '@/types/database';
 
 /**
  * Module 7: Data Export to CSV
@@ -7,7 +7,8 @@ import { Match, Player } from '@/types/database';
  */
 export function generateMatchesCSV(
   matches: Match[],
-  playersMap: Map<string, Player>
+  playersMap: Map<string, Player>,
+  courtsMap?: Map<string, Court>
 ): string {
   const headers = [
     'Match ID',
@@ -31,9 +32,15 @@ export function generateMatchesCSV(
       .map((id) => playersMap.get(id)?.name || id)
       .join(' & ');
 
+    const courtDisplay = m.court_id
+      ? courtsMap?.get(m.court_id)?.court_number !== undefined
+        ? `Court ${courtsMap.get(m.court_id)!.court_number}`
+        : 'N/A'
+      : 'N/A';
+
     return [
       `"${m.id}"`,
-      m.court_id || 'N/A',
+      courtDisplay,
       m.match_mode_used,
       `"${teamANames}"`,
       `"${teamBNames}"`,

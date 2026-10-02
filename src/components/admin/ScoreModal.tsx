@@ -370,7 +370,7 @@ export function ScoreModal({
           )}
 
           {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
             <button
               type="button"
               onClick={onClose}

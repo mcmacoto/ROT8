@@ -14,6 +14,7 @@ import { BulkImportModal } from '@/components/admin/BulkImportModal';
 import { LeaderboardDrawer } from '@/components/admin/LeaderboardDrawer';
 import { ShareSessionModal } from '@/components/admin/ShareSessionModal';
 import { EndSessionModal } from '@/components/admin/EndSessionModal';
+import { MatchHistoryZone } from '@/components/admin/MatchHistoryZone';
 import { ParsedPlayer } from '@/lib/utils/parse-player-list';
 import { StalledSlot, computeOnDeckCap } from '@/lib/engine/cap';
 import { createClient } from '@/lib/supabase/client';
@@ -211,6 +212,7 @@ export default function AdminConsolePage({
   const restingPlayers = players.filter((p) => p.status === 'resting');
   const checkedInPlayers = players.filter((p) => p.status === 'checked_in');
   const availableCourts = courts.filter((c) => c.status === 'available');
+  const completedMatches = matches.filter((m) => m.stage === 'completed');
 
   // Handlers
   const handleStartMatch = async (courtId: string, matchId: string) => {
@@ -319,21 +321,29 @@ export default function AdminConsolePage({
     loadData();
   };
 
-  const handleRelaxBounds = async (matchId: string) => {
-    await fetch(`/api/admin/${sessionId}/on-deck`, {
+  const handleRelaxBounds = async (matchIdOrSlot: string) => {
+    const res = await fetch(`/api/admin/${sessionId}/on-deck`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'relax_bounds', matchId }),
+      body: JSON.stringify({ action: 'relax_bounds', matchId: matchIdOrSlot, slotNumber: Number(matchIdOrSlot) || undefined }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to relax bounds' }));
+      console.error(err.error);
+    }
     loadData();
   };
 
-  const handleShiftToSocial = async (matchId: string) => {
-    await fetch(`/api/admin/${sessionId}/on-deck`, {
+  const handleShiftToSocial = async (matchIdOrSlot: string) => {
+    const res = await fetch(`/api/admin/${sessionId}/on-deck`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'shift_to_social', matchId }),
+      body: JSON.stringify({ action: 'shift_to_social', matchId: matchIdOrSlot, slotNumber: Number(matchIdOrSlot) || undefined }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to shift to social' }));
+      console.error(err.error);
+    }
     loadData();
   };
 
@@ -399,53 +409,73 @@ export default function AdminConsolePage({
   };
 
   const handleLockPair = async (p1: string, p2: string) => {
-    await fetch(`/api/admin/${sessionId}/pair-lock`, {
+    const res = await fetch(`/api/admin/${sessionId}/pair-lock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create', player1Id: p1, player2Id: p2 }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to lock pair' }));
+      throw new Error(err.error || 'Failed to lock pair');
+    }
     loadData();
   };
 
   const handleDissolvePair = async (playerId: string) => {
-    await fetch(`/api/admin/${sessionId}/pair-lock`, {
+    const res = await fetch(`/api/admin/${sessionId}/pair-lock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'dissolve', playerId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to dissolve pair' }));
+      throw new Error(err.error || 'Failed to dissolve pair');
+    }
     loadData();
   };
 
   const handleApprovePairRequest = async (requestId: string) => {
-    await fetch(`/api/admin/${sessionId}/pair-lock`, {
+    const res = await fetch(`/api/admin/${sessionId}/pair-lock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'approve_request', requestId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to approve request' }));
+      alert(err.error || 'Failed to approve request');
+    }
     loadData();
   };
 
   const handleDismissPairRequest = async (requestId: string) => {
-    await fetch(`/api/admin/${sessionId}/pair-lock`, {
+    const res = await fetch(`/api/admin/${sessionId}/pair-lock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'dismiss_request', requestId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to dismiss request' }));
+      alert(err.error || 'Failed to dismiss request');
+    }
     loadData();
   };
 
   const handleSaveEdits = async (playerId: string, name: string, rating: StaticRating) => {
-    await fetch(`/api/admin/${sessionId}/players`, {
+    const res = await fetch(`/api/admin/${sessionId}/players`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, name, static_rating: rating }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to save player edits' }));
+      throw new Error(err.error || 'Failed to save player edits');
+    }
     loadData();
   };
 
   const handleReplaceOnDeck = async (outgoingPlayerId: string, incomingPlayerId: string) => {
     if (!selectedPlayerForEdit?.matchId) return;
-    await fetch(`/api/admin/${sessionId}/on-deck`, {
+    const res = await fetch(`/api/admin/${sessionId}/on-deck`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -455,25 +485,37 @@ export default function AdminConsolePage({
         incomingPlayerId,
       }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to replace player' }));
+      throw new Error(err.error || 'Failed to replace player');
+    }
     loadData();
   };
 
   const handleToggleResting = async (playerId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'resting' ? 'queued' : 'resting';
-    await fetch(`/api/admin/${sessionId}/players`, {
+    const res = await fetch(`/api/admin/${sessionId}/players`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, status: nextStatus }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update player status' }));
+      alert(err.error || 'Failed to update player status');
+    }
     loadData();
   };
 
   const handleDirectDispatch = async (courtId: string) => {
-    await fetch(`/api/admin/${sessionId}/matches`, {
+    const res = await fetch(`/api/admin/${sessionId}/matches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'direct_dispatch', courtId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Direct dispatch failed' }));
+      alert(err.error || 'Direct dispatch failed');
+    }
     loadData();
   };
 
@@ -700,6 +742,16 @@ export default function AdminConsolePage({
           onOpenBulkImport={() => setIsBulkImportOpen(true)}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onFillOnDeckSlots={handleFillOnDeckSlots}
+        />
+
+        {/* Zone 4: Match History & Results */}
+        <MatchHistoryZone
+          sessionId={sessionId}
+          completedMatches={completedMatches}
+          courts={courts}
+          playersMap={playersMap}
+          scoringRequired={session.scoring_required}
+          onCorrectionApplied={loadData}
         />
       </main>
 

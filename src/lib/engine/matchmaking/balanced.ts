@@ -1,5 +1,6 @@
 import { Player } from '@/types/database';
 import { getEffectiveRating } from './elo-rated';
+import { evaluateLockedPair, canPairPlayBalancedMode } from './locked-pairs';
 
 export interface MatchCandidate {
   teamA: Player[];
@@ -51,13 +52,38 @@ export function findBalancedMatch(
 
           if (!isValidPairGrouping) continue;
 
-          // Check rating spread
+          // Check rating spread & imbalanced locked pair handling
           const ratings = group.map((p) => getEffectiveRating(p));
           const maxR = Math.max(...ratings);
           const minR = Math.min(...ratings);
           const spread = Number((maxR - minR).toFixed(1));
 
-          if (spread > maxSpread) continue;
+          const hasLockedPair = group.some((p) => pairMap.has(p.id));
+
+          if (hasLockedPair) {
+            const p0PartnerId = pairMap.get(group[0].id);
+            const p0Partner = p0PartnerId ? group.find((p) => p.id === p0PartnerId) : null;
+            const pair1 = p0Partner ? evaluateLockedPair(group[0], p0Partner) : null;
+
+            const remaining = group.filter((p) => p.id !== group[0].id && p.id !== p0PartnerId);
+            const rem0PartnerId = remaining.length === 2 ? pairMap.get(remaining[0].id) : null;
+            const remPartner = rem0PartnerId && remaining[1].id === rem0PartnerId ? remaining[1] : null;
+            const pair2 = remPartner ? evaluateLockedPair(remaining[0], remaining[1]) : null;
+
+            const anyImbalanced = Boolean(pair1?.isImbalanced || pair2?.isImbalanced);
+
+            if (anyImbalanced) {
+              if (pair1 && pair2 && canPairPlayBalancedMode(pair1, pair2)) {
+                // Counterbalanced opposing locked pairs permitted
+              } else {
+                continue; // Imbalanced pair without counterbalancing opposing pair rejected
+              }
+            } else if (spread > maxSpread) {
+              continue;
+            }
+          } else if (spread > maxSpread) {
+            continue;
+          }
 
           // Try all valid team split permutations (keeping pairs together)
           const permutations = getValidTeamPermutations(group, pairMap);
@@ -105,13 +131,13 @@ function getValidTeamPermutations(
 
   for (const split of splits) {
     // Verify that neither team breaks a pair
-    const p0Partner = pairMap.get(group[0].id);
-    if (p0Partner) {
-      const p0PartnerInTeamA = split.teamA.some((p) => p.id === p0Partner);
-      if (!p0PartnerInTeamA && split.teamA.some((p) => p.id === group[0].id)) {
-        continue;
-      }
-    }
+    const isPairIntact = split.teamA.every((player) => {
+      const partnerId = pairMap.get(player.id);
+      if (!partnerId) return true;
+      return split.teamA.some((teammate) => teammate.id === partnerId);
+    });
+
+    if (!isPairIntact) continue;
 
     result.push(split);
   }

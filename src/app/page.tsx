@@ -297,7 +297,7 @@ export default function HomePage() {
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ padding: '8px', backgroundColor: 'var(--color-terracotta-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-terracotta-dark)' }}>
                   <IconDeviceTablet size={22} />
@@ -347,15 +347,18 @@ export default function HomePage() {
             alignItems: 'center',
             justifyContent: 'center',
             backdropFilter: 'blur(4px)',
+            padding: '16px',
           }}
         >
           <div
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 'var(--radius-lg)',
-              width: '90%',
+              width: '100%',
               maxWidth: '460px',
-              padding: '28px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
               boxShadow: 'var(--shadow-lg)',
               border: '1px solid rgba(62, 47, 35, 0.1)',
             }}

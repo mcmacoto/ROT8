@@ -6,6 +6,7 @@ import { executeMatchForfeit } from '@/lib/engine/state-machine/forfeit';
 import { calculateEloUpdates } from '@/lib/engine/matchmaking/elo-rated';
 import { triggerAutoDispatchIfEligible } from '@/lib/engine/auto-dispatch';
 import { composeOnDeckSlot, fillAvailableOnDeckSlots } from '@/lib/engine/on-deck';
+import { syncLockedPairsElo } from '@/lib/engine/locked-pair-dissolution';
 
 export async function POST(
   request: NextRequest,
@@ -177,6 +178,7 @@ export async function POST(
         ),
       ];
       await Promise.all(playerUpdates);
+      await syncLockedPairsElo(sessionId, [...match.team_a_ids, ...match.team_b_ids]);
     } else {
       // Scoring disabled - record wins/losses based on selected winner
       const playerUpdates = [

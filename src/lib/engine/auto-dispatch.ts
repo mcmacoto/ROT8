@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { fillAvailableOnDeckSlots } from './on-deck';
 
 /**
  * Checks if auto-dispatch is enabled for the session, and if an available court
@@ -63,6 +64,9 @@ export async function triggerAutoDispatchIfEligible(
     .from('players')
     .update({ status: 'summoned' })
     .in('id', allPlayerIds);
+
+  // 4. Replenish newly available on-deck slot(s)
+  await fillAvailableOnDeckSlots(sessionId);
 
   return true;
 }

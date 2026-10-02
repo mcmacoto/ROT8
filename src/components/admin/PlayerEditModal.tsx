@@ -468,7 +468,7 @@ export function PlayerEditModal({
           </div>
 
           {/* Footer Save / Cancel */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
             <button
               type="button"
               onClick={onClose}

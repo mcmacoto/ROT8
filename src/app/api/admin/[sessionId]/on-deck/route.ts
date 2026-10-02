@@ -14,7 +14,8 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { action, matchId, outgoingPlayerId, incomingPlayerId } = body;
+  const { action, matchId, slotNumber, outgoingPlayerId, incomingPlayerId } = body;
+  const targetIdOrSlot = matchId || slotNumber;
 
   try {
     if (action === 'fill_slots') {
@@ -28,12 +29,12 @@ export async function POST(
     }
 
     if (action === 'relax_bounds') {
-      const result = await relaxSlotBounds(sessionId, matchId);
+      const result = await relaxSlotBounds(sessionId, targetIdOrSlot);
       return NextResponse.json(result);
     }
 
     if (action === 'shift_to_social') {
-      const result = await shiftSlotToSocial(sessionId, matchId);
+      const result = await shiftSlotToSocial(sessionId, targetIdOrSlot);
       return NextResponse.json(result);
     }
 

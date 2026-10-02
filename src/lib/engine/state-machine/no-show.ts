@@ -26,27 +26,50 @@ export async function handleNoShowRedraft(
     throw new Error('Match not found');
   }
 
-  // 2. Move offending player to resting
+  // 2. Move offending player to resting and dissolve any active locked pair
   await supabase
     .from('players')
     .update({ status: 'resting', staged_match_id: null })
     .eq('id', noShowPlayerId);
 
-  // 3. Find next eligible queued player
-  const { data: availableQueue } = await supabase
-    .from('players')
-    .select('*')
+  await supabase
+    .from('locked_pairs')
+    .update({ is_active: false })
     .eq('session_id', sessionId)
-    .eq('status', 'queued')
-    .is('staged_match_id', null)
-    .order('wait_started_at', { ascending: true })
-    .limit(1);
+    .eq('is_active', true)
+    .or(`player_1_id.eq.${noShowPlayerId},player_2_id.eq.${noShowPlayerId}`);
 
-  if (!availableQueue || availableQueue.length === 0) {
-    throw new Error('No eligible queued player available to replace no-show');
+  // 3. Find next eligible queued solo player (must not break an active locked pair)
+  const [{ data: availableQueue }, { data: activePairs }] = await Promise.all([
+    supabase
+      .from('players')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('status', 'queued')
+      .is('staged_match_id', null)
+      .order('wait_started_at', { ascending: true }),
+    supabase
+      .from('locked_pairs')
+      .select('player_1_id, player_2_id')
+      .eq('session_id', sessionId)
+      .eq('is_active', true),
+  ]);
+
+  const lockedPlayerIds = new Set<string>();
+  if (activePairs) {
+    for (const p of activePairs) {
+      lockedPlayerIds.add(p.player_1_id);
+      lockedPlayerIds.add(p.player_2_id);
+    }
   }
 
-  const replacementPlayer: Player = availableQueue[0];
+  const eligibleCandidates = (availableQueue || []).filter((p) => !lockedPlayerIds.has(p.id));
+
+  if (eligibleCandidates.length === 0) {
+    throw new Error('No eligible queued player available to replace no-show without breaking a locked pair.');
+  }
+
+  const replacementPlayer: Player = eligibleCandidates[0];
 
   // 4. Update team rosters
   let newTeamA = [...match.team_a_ids];

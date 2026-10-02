@@ -153,6 +153,48 @@ describe('Module 2: Balanced Mode Team Assignment', () => {
     // p1 and p2 must either both be on Team A, or both on Team B
     expect((teamAHasP1 && teamAHasP2) || (teamBHasP1 && teamBHasP2)).toBe(true);
   });
+
+  it('keeps locked pair together when solo player is at index 0 (Issue #6)', () => {
+    // p_solo is index 0; p_pair1 and p_pair2 are at indices 1 and 2
+    const players = [
+      createMockPlayer('p_solo1', 'Solo 1', 3.0, 50),
+      createMockPlayer('p_pair1', 'Pair 1', 3.0, 40),
+      createMockPlayer('p_pair2', 'Pair 2', 3.0, 30),
+      createMockPlayer('p_solo2', 'Solo 2', 3.0, 20),
+    ];
+
+    const lockedPairs = [{ player1Id: 'p_pair1', player2Id: 'p_pair2' }];
+    const match = findBalancedMatch(players, lockedPairs);
+    expect(match).not.toBeNull();
+
+    const teamAHasP1 = match!.teamA.some((p) => p.id === 'p_pair1');
+    const teamAHasP2 = match!.teamA.some((p) => p.id === 'p_pair2');
+    const teamBHasP1 = match!.teamB.some((p) => p.id === 'p_pair1');
+    const teamBHasP2 = match!.teamB.some((p) => p.id === 'p_pair2');
+
+    expect((teamAHasP1 && teamAHasP2) || (teamBHasP1 && teamBHasP2)).toBe(true);
+  });
+
+  it('permits imbalanced locked pair (|R1 - R2| >= 1.5) when matched against counterbalancing opposing pair (Issue #10)', () => {
+    // Pair 1: 2.0 and 3.5 (diff 1.5, composite 2.8)
+    // Pair 2: 2.0 and 3.5 (diff 1.5, composite 2.8)
+    // Individual spread is 1.5, which exceeds default maxSpread of 1.0
+    const players = [
+      createMockPlayer('p1_a', 'P1A', 2.0, 50),
+      createMockPlayer('p1_b', 'P1B', 3.5, 45),
+      createMockPlayer('p2_a', 'P2A', 2.0, 40),
+      createMockPlayer('p2_b', 'P2B', 3.5, 35),
+    ];
+
+    const lockedPairs = [
+      { player1Id: 'p1_a', player2Id: 'p1_b' },
+      { player1Id: 'p2_a', player2Id: 'p2_b' },
+    ];
+
+    const match = findBalancedMatch(players, lockedPairs, 1.0);
+    expect(match).not.toBeNull();
+    expect(match!.teamDisparity).toBeLessThanOrEqual(0.5);
+  });
 });
 
 describe('Module 2: Skill-Separated Tiered Play', () => {
@@ -175,5 +217,30 @@ describe('Module 2: Skill-Separated Tiered Play', () => {
     // All 4 players must be from Tier 1
     const allTier1 = [...match!.teamA, ...match!.teamB].every((p) => (p.static_rating ?? 0) <= 2.5);
     expect(allTier1).toBe(true);
+  });
+
+  it('assigns cross-tier locked pair to tier based on composite rating (Issue #11)', () => {
+    // Player A is 2.5 (Tier 1 threshold), Player B is 3.1 (Tier 2)
+    // Composite: 2.8 -> Tier 2
+    // Along with two other Tier 2 players (3.0, 3.0), they form a valid Tier 2 match
+    const players = [
+      createMockPlayer('p_a', 'Player A', 2.5, 60),
+      createMockPlayer('p_b', 'Player B', 3.1, 55),
+      createMockPlayer('p_c', 'Player C', 3.0, 50),
+      createMockPlayer('p_d', 'Player D', 3.0, 45),
+    ];
+
+    const lockedPairs = [{ player1Id: 'p_a', player2Id: 'p_b' }];
+    const match = findSkillSeparatedMatch(players, lockedPairs);
+
+    expect(match).not.toBeNull();
+    const allMatchPlayerIds = [...match!.teamA, ...match!.teamB].map((p) => p.id);
+    expect(allMatchPlayerIds).toContain('p_a');
+    expect(allMatchPlayerIds).toContain('p_b');
+
+    // Both partners must be co-located on either Team A or Team B
+    const onTeamA = match!.teamA.some((p) => p.id === 'p_a') && match!.teamA.some((p) => p.id === 'p_b');
+    const onTeamB = match!.teamB.some((p) => p.id === 'p_a') && match!.teamB.some((p) => p.id === 'p_b');
+    expect(onTeamA || onTeamB).toBe(true);
   });
 });

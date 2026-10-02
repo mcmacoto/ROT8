@@ -25,11 +25,47 @@ export function findSkillSeparatedMatch(
 
   const now = Date.now();
 
+  const playerMap = new Map<string, Player>(eligiblePlayers.map((p) => [p.id, p]));
+  const pairMap = new Map<string, string>();
+  for (const lp of lockedPairs) {
+    pairMap.set(lp.player1Id, lp.player2Id);
+    pairMap.set(lp.player2Id, lp.player1Id);
+  }
+
+  const assignedPlayerIds = new Set<string>();
+
   for (const player of eligiblePlayers) {
-    const tier = getPlayerTier(getEffectiveRating(player));
-    if (tier === 'tier1_recreational') tier1.push(player);
-    else if (tier === 'tier2_intermediate') tier2.push(player);
-    else tier3.push(player);
+    if (assignedPlayerIds.has(player.id)) continue;
+
+    const partnerId = pairMap.get(player.id);
+    const partner = partnerId ? playerMap.get(partnerId) : null;
+
+    if (partner) {
+      // Locked pair: determine tier based on composite rating
+      const r1 = getEffectiveRating(player);
+      const r2 = getEffectiveRating(partner);
+      const compositeRating = Number(((r1 + r2) / 2).toFixed(1));
+      const pairTier = getPlayerTier(compositeRating);
+
+      if (pairTier === 'tier1_recreational') {
+        tier1.push(player, partner);
+      } else if (pairTier === 'tier2_intermediate') {
+        tier2.push(player, partner);
+      } else {
+        tier3.push(player, partner);
+      }
+
+      assignedPlayerIds.add(player.id);
+      assignedPlayerIds.add(partner.id);
+    } else {
+      // Solo player
+      const tier = getPlayerTier(getEffectiveRating(player));
+      if (tier === 'tier1_recreational') tier1.push(player);
+      else if (tier === 'tier2_intermediate') tier2.push(player);
+      else tier3.push(player);
+
+      assignedPlayerIds.add(player.id);
+    }
   }
 
   // Calculate aggregate bench wait time (in ms) for tiers with at least 4 players

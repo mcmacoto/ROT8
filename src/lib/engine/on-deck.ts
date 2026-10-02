@@ -167,45 +167,93 @@ export async function rerollSlot(sessionId: string, matchId: string) {
 /**
  * Recovery Action 1: Relax Skill Bounds
  * Widens rating spread by 0.5 and recomposes for that slot only.
+ * Supports either an active matchId or a slotNumber for stalled slots.
  */
-export async function relaxSlotBounds(sessionId: string, matchId: string) {
+export async function relaxSlotBounds(sessionId: string, slotOrMatchId: string | number) {
   const supabase = await createClient();
 
-  const { data: match } = await supabase
-    .from('matches')
-    .select('*')
-    .eq('id', matchId)
-    .eq('stage', 'on_deck')
-    .single();
+  let slotNumber = 1;
+  let mode: MatchMode = 'balanced';
 
-  if (!match) throw new Error('On-deck match not found');
+  if (typeof slotOrMatchId === 'string' && isNaN(Number(slotOrMatchId))) {
+    const { data: match } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', slotOrMatchId)
+      .eq('stage', 'on_deck')
+      .single();
 
-  const slotNumber = match.on_deck_slot_number || 1;
-  await releaseStagedPlayers(sessionId, matchId);
-  await supabase.from('matches').delete().eq('id', matchId);
+    if (match) {
+      slotNumber = match.on_deck_slot_number || 1;
+      mode = match.match_mode_used;
+      await releaseStagedPlayers(sessionId, match.id);
+      await supabase.from('matches').delete().eq('id', match.id);
+    }
+  } else {
+    slotNumber = Number(slotOrMatchId);
+    const { data: existingMatch } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('stage', 'on_deck')
+      .eq('on_deck_slot_number', slotNumber)
+      .single();
 
-  return composeOnDeckSlot(sessionId, slotNumber, match.match_mode_used, { maxSpread: 1.5 });
+    if (existingMatch) {
+      mode = existingMatch.match_mode_used;
+      await releaseStagedPlayers(sessionId, existingMatch.id);
+      await supabase.from('matches').delete().eq('id', existingMatch.id);
+    } else {
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('match_mode')
+        .eq('id', sessionId)
+        .single();
+      mode = session?.match_mode || 'balanced';
+    }
+  }
+
+  return composeOnDeckSlot(sessionId, slotNumber, mode, { maxSpread: 1.5 });
 }
 
 /**
  * Recovery Action 2: Shift to Social Mode
  * Recomposes that slot using Social Mode logic without affecting global session mode.
+ * Supports either an active matchId or a slotNumber for stalled slots.
  */
-export async function shiftSlotToSocial(sessionId: string, matchId: string) {
+export async function shiftSlotToSocial(sessionId: string, slotOrMatchId: string | number) {
   const supabase = await createClient();
 
-  const { data: match } = await supabase
-    .from('matches')
-    .select('*')
-    .eq('id', matchId)
-    .eq('stage', 'on_deck')
-    .single();
+  let slotNumber = 1;
 
-  if (!match) throw new Error('On-deck match not found');
+  if (typeof slotOrMatchId === 'string' && isNaN(Number(slotOrMatchId))) {
+    const { data: match } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', slotOrMatchId)
+      .eq('stage', 'on_deck')
+      .single();
 
-  const slotNumber = match.on_deck_slot_number || 1;
-  await releaseStagedPlayers(sessionId, matchId);
-  await supabase.from('matches').delete().eq('id', matchId);
+    if (match) {
+      slotNumber = match.on_deck_slot_number || 1;
+      await releaseStagedPlayers(sessionId, match.id);
+      await supabase.from('matches').delete().eq('id', match.id);
+    }
+  } else {
+    slotNumber = Number(slotOrMatchId);
+    const { data: existingMatch } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('stage', 'on_deck')
+      .eq('on_deck_slot_number', slotNumber)
+      .single();
+
+    if (existingMatch) {
+      await releaseStagedPlayers(sessionId, existingMatch.id);
+      await supabase.from('matches').delete().eq('id', existingMatch.id);
+    }
+  }
 
   return composeOnDeckSlot(sessionId, slotNumber, 'social');
 }

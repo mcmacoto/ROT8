@@ -319,6 +319,7 @@ export function BulkImportModal({
               borderTop: '1px solid rgba(62, 47, 35, 0.08)',
               display: 'flex',
               justifyContent: 'flex-end',
+              flexWrap: 'wrap',
               gap: '10px',
               backgroundColor: '#FAFAF8',
             }}

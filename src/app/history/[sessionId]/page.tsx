@@ -190,7 +190,8 @@ export default function SessionAuditDetailPage({
 
   // Handle CSV Download
   const handleDownloadCSV = () => {
-    const csvContent = generateMatchesCSV(completedMatches, playersMap);
+    const courtsMap = new Map<string, Court>(courts.map((c) => [c.id, c]));
+    const csvContent = generateMatchesCSV(completedMatches, playersMap, courtsMap);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -208,10 +209,12 @@ export default function SessionAuditDetailPage({
         style={{
           backgroundColor: '#FFFFFF',
           borderBottom: '1px solid rgba(62, 47, 35, 0.12)',
-          padding: '16px 24px',
+          padding: '14px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -400,6 +403,8 @@ export default function SessionAuditDetailPage({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                     padding: '12px 16px',
                     backgroundColor: 'var(--color-cream-light)',
                     borderRadius: 'var(--radius-sm)',

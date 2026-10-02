@@ -165,7 +165,7 @@ export async function PATCH(request: NextRequest) {
     if (action === 'toggle_rest') {
       const { data: current } = await supabase
         .from('players')
-        .select('status')
+        .select('status, session_id')
         .eq('id', playerId)
         .single();
 
@@ -180,14 +180,24 @@ export async function PATCH(request: NextRequest) {
       }
 
       const nextStatus = current.status === 'queued' ? 'resting' : 'queued';
+      const updatePayload: { status: string; wait_started_at?: string } = { status: nextStatus };
+      if (nextStatus === 'queued') {
+        updatePayload.wait_started_at = new Date().toISOString();
+      }
+
       const { data: updated, error } = await supabase
         .from('players')
-        .update({ status: nextStatus })
+        .update(updatePayload)
         .eq('id', playerId)
         .select()
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      if (nextStatus === 'queued' && current.session_id) {
+        await fillAvailableOnDeckSlots(current.session_id);
+      }
+
       return NextResponse.json({ player: updated });
     }
 

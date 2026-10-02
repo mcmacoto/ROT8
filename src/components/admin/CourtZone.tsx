@@ -36,10 +36,7 @@ export function CourtZone({
 }: CourtZoneProps) {
   const nowMs = useNow();
 
-  const matchMap = new Map<string, Match>();
-  for (const m of matches) {
-    if (m.court_id) matchMap.set(m.court_id, m);
-  }
+  const matchesMap = new Map<string, Match>(matches.map((m) => [m.id, m]));
 
   const onDeckMatches = matches
     .filter((m) => m.stage === 'on_deck')
@@ -61,7 +58,7 @@ export function CourtZone({
 
       <div className="responsive-grid-courts">
         {courts.map((court) => {
-          const match = court.current_match_id ? matchMap.get(court.id) : null;
+          const match = court.current_match_id ? matchesMap.get(court.current_match_id) || null : null;
           const isSummoning = court.status === 'summoning';
           const isInMatch = court.status === 'in_match';
           const isNeedsAttention = court.status === 'needs_attention';

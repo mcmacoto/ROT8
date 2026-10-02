@@ -20,10 +20,34 @@ export async function POST(
 
   // Action: "create" manual locked pair
   if (action === 'create') {
+    if (player1Id === player2Id) {
+      return NextResponse.json({ error: 'Cannot pair a player with themselves.' }, { status: 400 });
+    }
+
     const { data: p1 } = await supabase.from('players').select('*').eq('id', player1Id).single();
     const { data: p2 } = await supabase.from('players').select('*').eq('id', player2Id).single();
 
     if (!p1 || !p2) return NextResponse.json({ error: 'Players not found' }, { status: 404 });
+
+    // Validate neither player is currently in an active pair
+    const { data: activePairs } = await supabase
+      .from('locked_pairs')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('is_active', true)
+      .or(`player_1_id.eq.${player1Id},player_2_id.eq.${player1Id},player_1_id.eq.${player2Id},player_2_id.eq.${player2Id}`);
+
+    if (activePairs && activePairs.length > 0) {
+      return NextResponse.json({ error: 'One or both players are already in an active locked pair.' }, { status: 400 });
+    }
+
+    // Clean up any historical dissolved pair records for these players in this session
+    await supabase
+      .from('locked_pairs')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('is_active', false)
+      .or(`player_1_id.eq.${player1Id},player_2_id.eq.${player1Id},player_1_id.eq.${player2Id},player_2_id.eq.${player2Id}`);
 
     const pairEval = evaluateLockedPair(p1, p2);
 
@@ -70,6 +94,26 @@ export async function POST(
     const { data: p2 } = await supabase.from('players').select('*').eq('id', req.target_id).single();
 
     if (!p1 || !p2) return NextResponse.json({ error: 'Players not found' }, { status: 404 });
+
+    // Validate neither player is currently in an active pair
+    const { data: activePairs } = await supabase
+      .from('locked_pairs')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('is_active', true)
+      .or(`player_1_id.eq.${p1.id},player_2_id.eq.${p1.id},player_1_id.eq.${p2.id},player_2_id.eq.${p2.id}`);
+
+    if (activePairs && activePairs.length > 0) {
+      return NextResponse.json({ error: 'One or both players are already in an active locked pair.' }, { status: 400 });
+    }
+
+    // Clean up any historical dissolved pair records for these players
+    await supabase
+      .from('locked_pairs')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('is_active', false)
+      .or(`player_1_id.eq.${p1.id},player_2_id.eq.${p1.id},player_1_id.eq.${p2.id},player_2_id.eq.${p2.id}`);
 
     const pairEval = evaluateLockedPair(p1, p2);
 

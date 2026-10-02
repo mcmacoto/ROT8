@@ -288,17 +288,21 @@ export default function MobilePlayerHubPage({
 
   const handleToggleRest = async () => {
     if (!currentPlayer) return;
-    await fetch('/api/player', {
+    const res = await fetch('/api/player', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'toggle_rest', playerId: currentPlayer.id }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update rest status' }));
+      alert(err.error || 'Failed to update rest status');
+    }
     loadData();
   };
 
   const handleRequestPair = async (targetPlayerId: string) => {
     if (!currentPlayer) return;
-    await fetch('/api/player', {
+    const res = await fetch('/api/player', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -308,6 +312,10 @@ export default function MobilePlayerHubPage({
         targetId: targetPlayerId,
       }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to send pair request' }));
+      alert(err.error || 'Failed to send pair request');
+    }
     loadData();
   };
 

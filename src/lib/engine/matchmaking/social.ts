@@ -65,12 +65,12 @@ export function findSocialMatch(
 
           for (const split of splits) {
             // Verify pair not split across teams
-            const p0Partner = pairMap.get(group[0].id);
-            if (p0Partner) {
-              const p0InTeamA = split.teamA.some((p) => p.id === group[0].id);
-              const partnerInTeamA = split.teamA.some((p) => p.id === p0Partner);
-              if (p0InTeamA !== partnerInTeamA) continue;
-            }
+            const isPairIntact = split.teamA.every((player) => {
+              const partnerId = pairMap.get(player.id);
+              if (!partnerId) return true;
+              return split.teamA.some((teammate) => teammate.id === partnerId);
+            });
+            if (!isPairIntact) continue;
 
             // Calculate wait score (minutes)
             const totalWaitMinutes = group.reduce(

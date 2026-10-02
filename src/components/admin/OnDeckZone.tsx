@@ -138,38 +138,38 @@ export function OnDeckZone({
                       {stalled.reason}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                      {match && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onRelaxBounds(match.id)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: 'var(--color-cream-dark)',
-                              color: 'var(--color-umber)',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Relax Bounds (+0.5)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onShiftToSocial(match.id)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: 'var(--color-olive-light)',
-                              color: 'var(--color-olive-dark)',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Shift to Social
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onRelaxBounds(match?.id || String(slotNumber))}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--color-cream-dark)',
+                          color: 'var(--color-umber)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: '1px solid rgba(62, 47, 35, 0.15)',
+                        }}
+                      >
+                        Relax Bounds (+0.5)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onShiftToSocial(match?.id || String(slotNumber))}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--color-olive-light)',
+                          color: 'var(--color-olive-dark)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: '1px solid rgba(85, 107, 47, 0.2)',
+                        }}
+                      >
+                        Shift to Social
+                      </button>
                     </div>
                   </div>
                 ) : match ? (

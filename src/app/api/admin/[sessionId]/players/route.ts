@@ -231,21 +231,39 @@ export async function PATCH(
 
   if (status) {
     // Status override (resting, queued, checked_out, checked_in)
+    const updatePayload: Record<string, unknown> = { status };
+    if (status === 'queued') {
+      updatePayload.wait_started_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
       .from('players')
-      .update({ status })
+      .update(updatePayload)
       .eq('id', playerId)
       .eq('session_id', sessionId)
       .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    if (status === 'queued') {
+      await fillAvailableOnDeckSlots(sessionId);
+    }
+
     return NextResponse.json({ player: data });
   }
 
   // Edit name / rating (NO AUDIT LOG table written per Module 1 §6)
   try {
-    const updated = await editPlayer(playerId, { name, static_rating });
+    let sanitizedName: string | undefined = undefined;
+    if (name !== undefined) {
+      sanitizedName = sanitizePlayerName(name);
+      if (sanitizedName.length < 1) {
+        return NextResponse.json({ error: 'Player name must contain at least 1 valid character.' }, { status: 400 });
+      }
+    }
+
+    const updated = await editPlayer(playerId, { name: sanitizedName, static_rating });
     return NextResponse.json({ player: updated });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Edit player failed';

@@ -71,7 +71,9 @@ export function EndSessionModal({
           borderRadius: '16px',
           width: '100%',
           maxWidth: '440px',
-          padding: '28px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          padding: '24px',
           boxShadow: '0 20px 40px -8px rgba(62, 47, 35, 0.25)',
           border: '1px solid #EFEAE3',
         }}
@@ -157,7 +159,7 @@ export function EndSessionModal({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={onClose}

@@ -60,6 +60,7 @@ export function QueueZone({
   const [pairP1, setPairP1] = useState('');
   const [pairP2, setPairP2] = useState('');
   const [isLocking, setIsLocking] = useState(false);
+  const [pairError, setPairError] = useState<string | null>(null);
   const nowMs = useNow();
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -109,9 +110,12 @@ export function QueueZone({
     if (!pairP1 || !pairP2 || pairP1 === pairP2) return;
     try {
       setIsLocking(true);
+      setPairError(null);
       await onLockPair(pairP1, pairP2);
       setPairP1('');
       setPairP2('');
+    } catch (err: unknown) {
+      setPairError(err instanceof Error ? err.message : 'Failed to lock pair');
     } finally {
       setIsLocking(false);
     }
@@ -640,6 +644,21 @@ export function QueueZone({
             <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-umber)', marginBottom: '10px' }}>
               Lock Pair Together
             </h4>
+            {pairError && (
+              <div
+                style={{
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--color-alert-light)',
+                  color: 'var(--color-alert-dark)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.775rem',
+                  fontWeight: 600,
+                  marginBottom: '10px',
+                }}
+              >
+                {pairError}
+              </div>
+            )}
             <form onSubmit={handleLockPair} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <select
                 value={pairP1}

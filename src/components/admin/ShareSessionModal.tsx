@@ -79,6 +79,8 @@ export function ShareSessionModal({
           borderRadius: 'var(--radius-lg)',
           width: '100%',
           maxWidth: '440px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid rgba(62, 47, 35, 0.12)',
           overflow: 'hidden',
