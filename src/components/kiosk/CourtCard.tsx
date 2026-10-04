@@ -86,11 +86,22 @@ export function CourtCard({ court, match, playersMap, nowMs }: CourtCardProps) {
           borderBottom: '1px solid rgba(245, 240, 232, 0.08)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#F5F0E8', letterSpacing: '0.02em' }}>
-            COURT {court.court_number}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#F5F0E8',
+              letterSpacing: '0.02em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+            title={court.name || `COURT ${court.court_number}`}
+          >
+            {court.name || `COURT ${court.court_number}`}
           </span>
-          <span style={{ fontSize: '0.8rem', color: 'rgba(245, 240, 232, 0.6)', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '0.8rem', color: 'rgba(245, 240, 232, 0.6)', textTransform: 'uppercase', flexShrink: 0 }}>
             {court.assigned_match_type}
           </span>
         </div>
@@ -120,7 +131,7 @@ export function CourtCard({ court, match, playersMap, nowMs }: CourtCardProps) {
         {match && (isInMatch || isSummoning || isNeedsAttention) ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '14px', alignItems: 'center' }}>
             {/* Team A */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8A9A5B', letterSpacing: '0.05em' }}>
                 TEAM A
               </div>
@@ -132,9 +143,22 @@ export function CourtCard({ court, match, playersMap, nowMs }: CourtCardProps) {
                     padding: '8px 12px',
                     borderRadius: 'var(--radius-sm)',
                     border: '1px solid rgba(245, 240, 232, 0.1)',
+                    minWidth: 0,
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#F5F0E8' }}>{p.name}</div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      color: '#F5F0E8',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={p.name}
+                  >
+                    {p.name}
+                  </div>
                   <div style={{ fontSize: '0.75rem', color: 'rgba(245, 240, 232, 0.6)' }}>
                     {formatRating(p.static_rating)} • Elo {p.current_elo}
                   </div>
@@ -143,12 +167,12 @@ export function CourtCard({ court, match, playersMap, nowMs }: CourtCardProps) {
             </div>
 
             {/* vs */}
-            <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'rgba(245, 240, 232, 0.3)' }}>
+            <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'rgba(245, 240, 232, 0.3)', flexShrink: 0 }}>
               VS
             </div>
 
             {/* Team B */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8A9A5B', letterSpacing: '0.05em' }}>
                 TEAM B
               </div>
@@ -160,9 +184,22 @@ export function CourtCard({ court, match, playersMap, nowMs }: CourtCardProps) {
                     padding: '8px 12px',
                     borderRadius: 'var(--radius-sm)',
                     border: '1px solid rgba(245, 240, 232, 0.1)',
+                    minWidth: 0,
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#F5F0E8' }}>{p.name}</div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      color: '#F5F0E8',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={p.name}
+                  >
+                    {p.name}
+                  </div>
                   <div style={{ fontSize: '0.75rem', color: 'rgba(245, 240, 232, 0.6)' }}>
                     {formatRating(p.static_rating)} • Elo {p.current_elo}
                   </div>

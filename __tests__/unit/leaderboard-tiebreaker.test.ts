@@ -51,7 +51,7 @@ describe('Module 7: Strict Hierarchical Leaderboard Tie-Breaking', () => {
     expect(leaderboard[1].player.id).toBe('p2');
   });
 
-  it('breaks ties in Standard Mode (Scoring ON): Win% -> diff -> matches -> SOS -> FIFO', () => {
+  it('breaks ties in Standard Mode (Scoring ON): Win% -> games played -> diff -> SOS -> FIFO', () => {
     // p1: 3-1 (75%), p2: 2-0 (100%)
     const p1 = createPlayerRecord('p1', 'P1', 1200, 3, 1, 10, 30);
     const p2 = createPlayerRecord('p2', 'P2', 1200, 2, 0, 8, 20);
@@ -62,8 +62,20 @@ describe('Module 7: Strict Hierarchical Leaderboard Tie-Breaking', () => {
     expect(leaderboard[1].player.id).toBe('p1');
   });
 
-  it('breaks ties using point differential when players have similar W-L records', () => {
-    // Both 3-1 (75% win rate), but p1 has +12 point diff vs p2 with +4 point diff
+  it('ranks player with 100% win rate over 5 games higher than 100% win rate over 1 game (Issue 3)', () => {
+    // p1 has 5-0 (100%), point differential +12
+    // p2 has 1-0 (100%), point differential +18 (higher differential, but only 1 game)
+    const p1 = createPlayerRecord('p1', 'Veteran Winner', 1200, 5, 0, 12, 30);
+    const p2 = createPlayerRecord('p2', 'Single Game Winner', 1200, 1, 0, 18, 20);
+
+    const leaderboard = computeLeaderboard([p2, p1], [], 'balanced', true);
+    // p1 must rank higher because of 5 games played vs 1 game played!
+    expect(leaderboard[0].player.id).toBe('p1');
+    expect(leaderboard[1].player.id).toBe('p2');
+  });
+
+  it('breaks ties using point differential when players have identical W-L records and games played', () => {
+    // Both 3-1 (75% win rate, 4 matches played), but p1 has +12 point diff vs p2 with +4 point diff
     const p1 = createPlayerRecord('p1', 'Player Alpha', 1200, 3, 1, 12, 30);
     const p2 = createPlayerRecord('p2', 'Player Beta', 1200, 3, 1, 4, 20);
 
@@ -72,7 +84,7 @@ describe('Module 7: Strict Hierarchical Leaderboard Tie-Breaking', () => {
     expect(leaderboard[1].player.id).toBe('p2');
   });
 
-  it('breaks ties in Standard Mode (Scoring OFF): Win% -> diff -> matches -> SOS -> FIFO', () => {
+  it('breaks ties in Standard Mode (Scoring OFF): Win% -> games played -> diff -> SOS -> FIFO', () => {
     // In unscored sessions, wins/losses are still tracked:
     // p1: 2-1 (66.7%), p2: 3-0 (100%)
     const p1 = createPlayerRecord('p1', 'P1', 1200, 2, 1, 0, 30);

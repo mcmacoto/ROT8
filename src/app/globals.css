@@ -99,6 +99,14 @@ input, select, textarea {
   border: 2px dashed var(--color-terracotta) !important;
 }
 
+/* Text Truncation Utility */
+.truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* Common Utility Classes */
 .badge {
   display: inline-flex;

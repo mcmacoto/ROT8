@@ -70,14 +70,68 @@ export function OnDeckPreview({ onDeckMatches, playersMap }: OnDeckPreviewProps)
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
-                <div style={{ fontSize: '0.85rem', color: '#F5F0E8', fontWeight: 600 }}>
-                  {teamAPlayers.map((p) => p.name).join(' & ')}
+                {/* Team A Chips */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                  {teamAPlayers.map((p) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        backgroundColor: '#0D0D0C',
+                        padding: '4px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid rgba(245, 240, 232, 0.12)',
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: '#F5F0E8',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={p.name}
+                      >
+                        {p.name}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'rgba(245, 240, 232, 0.3)' }}>
-                  vs
+
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'rgba(245, 240, 232, 0.35)', flexShrink: 0 }}>
+                  VS
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#F5F0E8', fontWeight: 600 }}>
-                  {teamBPlayers.map((p) => p.name).join(' & ')}
+
+                {/* Team B Chips */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                  {teamBPlayers.map((p) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        backgroundColor: '#0D0D0C',
+                        padding: '4px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid rgba(245, 240, 232, 0.12)',
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: '#F5F0E8',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={p.name}
+                      >
+                        {p.name}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

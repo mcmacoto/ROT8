@@ -39,6 +39,7 @@ export function MatchHistoryZone({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCourtId, setSelectedCourtId] = useState<string>('all');
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
+  const [displayCount, setDisplayCount] = useState<number>(15);
 
   const courtsMap = new Map<string, Court>(courts.map((c) => [c.id, c]));
 
@@ -68,6 +69,8 @@ export function MatchHistoryZone({
 
     return teamANames.includes(q) || teamBNames.includes(q);
   });
+
+  const visibleMatches = filteredMatches.slice(0, displayCount);
 
   return (
     <section style={{ marginBottom: '32px' }}>
@@ -240,7 +243,7 @@ export function MatchHistoryZone({
                   const courtMatchCount = completedMatches.filter((m) => m.court_id === c.id).length;
                   return (
                     <option key={c.id} value={c.id}>
-                      Court {c.court_number} ({courtMatchCount})
+                      {c.name || `Court ${c.court_number}`} ({courtMatchCount})
                     </option>
                   );
                 })}
@@ -283,7 +286,7 @@ export function MatchHistoryZone({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filteredMatches.map((m) => {
+              {visibleMatches.map((m) => {
                 const court = m.court_id ? courtsMap.get(m.court_id) : null;
                 const teamAPlayers = m.team_a_ids
                   .map((id) => playersMap.get(id))
@@ -339,7 +342,7 @@ export function MatchHistoryZone({
                           className="badge badge-terracotta"
                           style={{ fontSize: '0.75rem', fontWeight: 700 }}
                         >
-                          {court ? `COURT ${court.court_number}` : 'COURT'}
+                          {court ? (court.name || `COURT ${court.court_number}`) : 'COURT'}
                         </span>
 
                         {completedTimeStr && (
@@ -600,6 +603,33 @@ export function MatchHistoryZone({
                   </div>
                 );
               })}
+
+              {filteredMatches.length > displayCount && (
+                <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayCount((prev) => prev + 15)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--color-cream-light)',
+                      border: '1px solid rgba(62, 47, 35, 0.15)',
+                      color: 'var(--color-umber)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>Load More Matches</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-umber-muted)', fontWeight: 500 }}>
+                      ({filteredMatches.length - displayCount} remaining)
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { verifyHostAuthorization } from '@/lib/auth/require-host-auth';
+import { syncOnDeckSlotsToCap } from '@/lib/engine/on-deck';
 
 export async function PATCH(
   request: NextRequest,
@@ -31,6 +32,11 @@ export async function PATCH(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // If on_deck_cap_override was modified, prune excess slots and replenish/refresh queue
+  if (updates.on_deck_cap_override !== undefined) {
+    await syncOnDeckSlotsToCap(sessionId);
   }
 
   return NextResponse.json({ session: data });

@@ -93,13 +93,13 @@ export function computeLeaderboard(
       if (b.winRate !== a.winRate) {
         return b.winRate - a.winRate;
       }
-      // 2. Point differential
-      if (b.player.point_differential !== a.player.point_differential) {
-        return b.player.point_differential - a.player.point_differential;
-      }
-      // 3. Total matches played
+      // 2. Games played volume (e.g. 100% over 5 games ranks higher than 100% over 1 game)
       if (b.player.total_matches_played !== a.player.total_matches_played) {
         return b.player.total_matches_played - a.player.total_matches_played;
+      }
+      // 3. Point differential (tiebreaker when records and games played match)
+      if (b.player.point_differential !== a.player.point_differential) {
+        return b.player.point_differential - a.player.point_differential;
       }
       // 4. Strength of Schedule (SOS)
       if (b.strengthOfSchedule !== a.strengthOfSchedule) {
@@ -114,13 +114,13 @@ export function computeLeaderboard(
     if (b.winRate !== a.winRate) {
       return b.winRate - a.winRate;
     }
-    // 2. Point differential
-    if (b.player.point_differential !== a.player.point_differential) {
-      return b.player.point_differential - a.player.point_differential;
-    }
-    // 3. Total completed matches
+    // 2. Games played volume
     if (b.player.total_matches_played !== a.player.total_matches_played) {
       return b.player.total_matches_played - a.player.total_matches_played;
+    }
+    // 3. Point differential (tiebreaker)
+    if (b.player.point_differential !== a.player.point_differential) {
+      return b.player.point_differential - a.player.point_differential;
     }
     // 4. Strength of Schedule (SOS)
     if (b.strengthOfSchedule !== a.strengthOfSchedule) {

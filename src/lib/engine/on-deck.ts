@@ -1,13 +1,31 @@
 import { MatchMode, Match } from '@/types/database';
 import { findBalancedMatch } from './matchmaking/balanced';
 import { findSkillSeparatedMatch } from './matchmaking/skill-separated';
-import { findSocialMatch, PairingHistory } from './matchmaking/social';
+import { findSocialMatch, PairingHistory, makePairKey } from './matchmaking/social';
 import { createClient } from '@/lib/supabase/server';
 import { claimPlayersForMatch, releaseStagedPlayers } from '@/lib/db/claim-players';
 import { StalledSlot, computeOnDeckCap } from './cap';
 
 export type { StalledSlot };
-export { computeOnDeckCap };
+export { computeOnDeckCap, buildPairingHistory };
+
+/**
+ * Builds pairing frequency history from completed matches to penalize repeat partnerships in social mode.
+ */
+function buildPairingHistory(completedMatches: Partial<Match>[]): PairingHistory {
+  const history: PairingHistory = {};
+  for (const m of completedMatches) {
+    if (m.team_a_ids && m.team_a_ids.length === 2) {
+      const keyA = makePairKey(m.team_a_ids[0], m.team_a_ids[1]);
+      history[keyA] = (history[keyA] || 0) + 1;
+    }
+    if (m.team_b_ids && m.team_b_ids.length === 2) {
+      const keyB = makePairKey(m.team_b_ids[0], m.team_b_ids[1]);
+      history[keyB] = (history[keyB] || 0) + 1;
+    }
+  }
+  return history;
+}
 
 /**
  * Composes a single on-deck slot for a session using the session's active matchmaking mode.
@@ -54,6 +72,20 @@ export async function composeOnDeckSlot(
     player2Id: lp.player_2_id,
   }));
 
+  // Automatically construct pairing history for social mode if not supplied
+  let history = options.history;
+  if (!history && mode === 'social') {
+    const { data: pastMatches } = await supabase
+      .from('matches')
+      .select('team_a_ids, team_b_ids, stage')
+      .eq('session_id', sessionId)
+      .eq('stage', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(50);
+
+    history = buildPairingHistory(pastMatches || []);
+  }
+
   // 3. Match candidate according to mode
   let candidate = null;
   const spread = options.maxSpread ?? (mode === 'balanced' ? 1.0 : 1.5);
@@ -63,7 +95,7 @@ export async function composeOnDeckSlot(
   } else if (mode === 'skill_separated') {
     candidate = findSkillSeparatedMatch(players, lockedPairs);
   } else if (mode === 'social') {
-    candidate = findSocialMatch(players, options.history || {}, lockedPairs);
+    candidate = findSocialMatch(players, history || {}, lockedPairs);
   }
 
   if (!candidate) {
@@ -81,6 +113,19 @@ export async function composeOnDeckSlot(
   const teamAIds = candidate.teamA.map((p) => p.id);
   const teamBIds = candidate.teamB.map((p) => p.id);
   const allPlayerIds = [...teamAIds, ...teamBIds];
+
+  // Enforce strict player uniqueness: no duplicate player IDs in a match
+  if (new Set(allPlayerIds).size !== 4) {
+    return {
+      match: null,
+      stalled: {
+        isStalled: true,
+        slotNumber,
+        reason: 'Match candidate contained duplicate player assignments.',
+        recoveryActions: ['relax_skill_bounds', 'shift_to_social'],
+      },
+    };
+  }
 
   // 4. Create the match row in 'on_deck' stage
   const { data: createdMatch, error: matchError } = await supabase
@@ -297,4 +342,40 @@ export async function fillAvailableOnDeckSlots(sessionId: string): Promise<numbe
   }
 
   return createdCount;
+}
+
+/**
+ * Synchronizes on-deck slots with the effective cap.
+ * - Prunes any excess on-deck slots beyond cap and releases their players back to queued.
+ * - Replenishes any empty slots up to the cap.
+ */
+export async function syncOnDeckSlotsToCap(
+  sessionId: string
+): Promise<{ prunedCount: number; createdCount: number }> {
+  const supabase = await createClient();
+
+  const [
+    { data: session },
+    { data: courts },
+    { data: onDeckMatches }
+  ] = await Promise.all([
+    supabase.from('sessions').select('*').eq('id', sessionId).single(),
+    supabase.from('courts').select('id').eq('session_id', sessionId),
+    supabase.from('matches').select('id, on_deck_slot_number').eq('session_id', sessionId).eq('stage', 'on_deck'),
+  ]);
+
+  if (!session || !courts || courts.length === 0) return { prunedCount: 0, createdCount: 0 };
+
+  const cap = computeOnDeckCap(courts.length, session.on_deck_cap_override);
+  const excessMatches = (onDeckMatches || []).filter((m) => (m.on_deck_slot_number || 0) > cap);
+
+  let prunedCount = 0;
+  for (const match of excessMatches) {
+    await releaseStagedPlayers(sessionId, match.id);
+    await supabase.from('matches').delete().eq('id', match.id);
+    prunedCount++;
+  }
+
+  const createdCount = await fillAvailableOnDeckSlots(sessionId);
+  return { prunedCount, createdCount };
 }

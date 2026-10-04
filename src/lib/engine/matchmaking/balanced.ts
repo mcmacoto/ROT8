@@ -20,7 +20,14 @@ export function findBalancedMatch(
   lockedPairs: { player1Id: string; player2Id: string }[] = [],
   maxSpread = 1.0
 ): MatchCandidate | null {
-  if (eligiblePlayers.length < 4) return null;
+  // Deduplicate candidate players by id
+  const seenIds = new Set<string>();
+  const uniqueEligible = eligiblePlayers.filter((p) => {
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
+  if (uniqueEligible.length < 4) return null;
 
   // Build lookup of locked pairs
   const pairMap = new Map<string, string>();
@@ -30,19 +37,23 @@ export function findBalancedMatch(
   }
 
   // Sort candidate players by wait time descending (longest waiting first)
-  const pool = [...eligiblePlayers].sort(
+  const pool = [...uniqueEligible].sort(
     (a, b) => new Date(a.wait_started_at).getTime() - new Date(b.wait_started_at).getTime()
   );
 
   let bestMatch: MatchCandidate | null = null;
   let minDisparity = Infinity;
 
+  // Search through top candidate pool (capped at 20 to prevent combination explosion)
+  const candidatePool = pool.slice(0, Math.min(pool.length, 20));
+
   // Try candidate groups of 4 starting from highest wait time
-  for (let i = 0; i < pool.length - 3; i++) {
-    for (let j = i + 1; j < pool.length - 2; j++) {
-      for (let k = j + 1; k < pool.length - 1; k++) {
-        for (let l = k + 1; l < pool.length; l++) {
-          const group = [pool[i], pool[j], pool[k], pool[l]];
+  for (let i = 0; i < candidatePool.length - 3; i++) {
+    for (let j = i + 1; j < candidatePool.length - 2; j++) {
+      for (let k = j + 1; k < candidatePool.length - 1; k++) {
+        for (let l = k + 1; l < candidatePool.length; l++) {
+          const group = [candidatePool[i], candidatePool[j], candidatePool[k], candidatePool[l]];
+          if (new Set(group.map((p) => p.id)).size !== 4) continue;
 
           // Verify pair lock integrity: if a player is in the group, their partner must be in the group
           const isValidPairGrouping = group.every((player) => {

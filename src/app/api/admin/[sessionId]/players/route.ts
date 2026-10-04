@@ -49,14 +49,37 @@ export async function POST(
     const destinationStatus = body.status === 'checked_in' ? 'checked_in' : 'queued';
     const nowIso = new Date().toISOString();
 
-    const insertPayload = playersToImport.map((p) => ({
-      session_id: sessionId,
-      name: p.name,
-      static_rating: p.rating,
-      current_elo: calculateInitialElo(p.rating),
-      status: destinationStatus,
-      wait_started_at: nowIso,
-    }));
+    // Query existing session players to avoid duplicate names (Issue 8)
+    const { data: currentPlayers } = await supabase
+      .from('players')
+      .select('name')
+      .eq('session_id', sessionId)
+      .neq('status', 'checked_out');
+
+    const nameCounts = new Map<string, number>();
+    (currentPlayers || []).forEach((p) => {
+      const lower = p.name.trim().toLowerCase();
+      nameCounts.set(lower, (nameCounts.get(lower) || 0) + 1);
+    });
+
+    const insertPayload = playersToImport.map((p) => {
+      const lower = p.name.trim().toLowerCase();
+      let uniqueName = p.name;
+      const count = nameCounts.get(lower) || 0;
+      if (count > 0) {
+        uniqueName = `${p.name} (${count + 1})`;
+      }
+      nameCounts.set(lower, count + 1);
+
+      return {
+        session_id: sessionId,
+        name: uniqueName,
+        static_rating: p.rating,
+        current_elo: calculateInitialElo(p.rating),
+        status: destinationStatus,
+        wait_started_at: nowIso,
+      };
+    });
 
     let { data, error } = await supabase
       .from('players')
@@ -135,15 +158,19 @@ export async function POST(
     if (['on_court', 'summoned', 'staged'].includes(existing.status)) {
       return NextResponse.json(
         {
-          error: `Cannot checkout player while in status "${existing.status}". Forfeit match or substitute player first.`,
+          error: `Cannot checkout player while in status "${existing.status}". Substitute player first.`,
         },
         { status: 400 }
       );
     }
 
+    // If player is in queue or resting, removing them moves them to the Check-in / Holding list.
+    // If already in checked_in and removed again, or body.permanent is true, set to 'checked_out'.
+    const nextStatus = body.permanent || existing.status === 'checked_in' ? 'checked_out' : 'checked_in';
+
     const { data, error } = await supabase
       .from('players')
-      .update({ status: 'checked_out' })
+      .update({ status: nextStatus, staged_match_id: null })
       .eq('id', playerId)
       .eq('session_id', sessionId)
       .select()
@@ -170,9 +197,28 @@ export async function POST(
   const initialElo = calculateInitialElo(static_rating);
   const nowIso = new Date().toISOString();
 
+  // Check for duplicate names in session and disambiguate (Issue 8)
+  const { data: existingSameName } = await supabase
+    .from('players')
+    .select('name')
+    .eq('session_id', sessionId)
+    .neq('status', 'checked_out');
+
+  let resolvedName = cleanName;
+  if (existingSameName && existingSameName.length > 0) {
+    const matchingCount = existingSameName.filter(
+      (p) =>
+        p.name.trim().toLowerCase() === cleanName.toLowerCase() ||
+        p.name.trim().toLowerCase().startsWith(`${cleanName.toLowerCase()} (`)
+    ).length;
+    if (matchingCount > 0) {
+      resolvedName = `${cleanName} (${matchingCount + 1})`;
+    }
+  }
+
   const insertPayload: Record<string, unknown> = {
     session_id: sessionId,
-    name: cleanName,
+    name: resolvedName,
     static_rating,
     current_elo: initialElo,
     status: destinationStatus,

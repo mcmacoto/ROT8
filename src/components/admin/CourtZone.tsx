@@ -1,11 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Court, Match, Player } from '@/types/database';
 import { PlayerCard } from './PlayerCard';
 import { calculateGraceTimer, calculateMatchDuration } from '@/lib/engine/state-machine/grace-timer';
+import { auditMatchup } from '@/lib/engine/matchmaking/matchup-audit';
 import { useNow } from '@/lib/hooks/useNow';
-import { IconPlayerPlay, IconClock, IconAlertTriangle, IconCheck, IconUserX } from '@tabler/icons-react';
+import {
+  IconPlayerPlay,
+  IconClock,
+  IconAlertTriangle,
+  IconCheck,
+  IconPencil,
+  IconX,
+} from '@tabler/icons-react';
 
 interface CourtZoneProps {
   courts: Court[];
@@ -13,12 +21,14 @@ interface CourtZoneProps {
   playersMap: Map<string, Player>;
   lockedPairIds: Set<string>;
   hasOnDeckSlots: boolean;
-  onTapPlayer: (player: Player, isOnDeck: boolean) => void;
+  completedMatches?: Match[];
+  onTapPlayer: (player: Player, isOnDeck: boolean, matchId?: string, isSummoning?: boolean) => void;
   onStartMatch: (courtId: string, matchId: string) => Promise<void>;
   onCompleteMatch: (courtId: string, matchId: string) => void; // opens score modal or completes
-  onNoShow: (courtId: string, matchId: string, playerId: string) => void;
+  onNoShow?: (courtId: string, matchId: string, playerId: string) => void;
   onDirectDispatch: (courtId: string) => Promise<void>;
   onCallOnDeckToCourt?: (courtId: string, matchId: string) => Promise<void> | void;
+  onRenameCourt?: (courtId: string, newName: string) => Promise<void>;
 }
 
 export function CourtZone({
@@ -27,14 +37,28 @@ export function CourtZone({
   playersMap,
   lockedPairIds,
   hasOnDeckSlots,
+  completedMatches = [],
   onTapPlayer,
   onStartMatch,
   onCompleteMatch,
   onNoShow,
   onDirectDispatch,
   onCallOnDeckToCourt,
+  onRenameCourt,
 }: CourtZoneProps) {
   const nowMs = useNow();
+  const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
+  const [tempCourtName, setTempCourtName] = useState<string>('');
+
+  const handleSaveRename = async (courtId: string) => {
+    if (!tempCourtName.trim() || !onRenameCourt) return;
+    try {
+      await onRenameCourt(courtId, tempCourtName.trim());
+      setEditingCourtId(null);
+    } catch (err) {
+      console.error('Failed to rename court', err);
+    }
+  };
 
   const matchesMap = new Map<string, Match>(matches.map((m) => [m.id, m]));
 
@@ -102,9 +126,71 @@ export function CourtZone({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-umber)' }}>
-                    COURT {court.court_number}
-                  </span>
+                  {editingCourtId === court.id ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="text"
+                        value={tempCourtName}
+                        onChange={(e) => setTempCourtName(e.target.value)}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-terracotta)',
+                          maxWidth: '130px',
+                        }}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(court.id);
+                          if (e.key === 'Escape') setEditingCourtId(null);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSaveRename(court.id)}
+                        title="Save name"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-olive-dark)', padding: '2px' }}
+                      >
+                        <IconCheck size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingCourtId(null)}
+                        title="Cancel"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-umber-muted)', padding: '2px' }}
+                      >
+                        <IconX size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-umber)' }}>
+                        {court.name || `COURT ${court.court_number}`}
+                      </span>
+                      {onRenameCourt && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCourtId(court.id);
+                            setTempCourtName(court.name || `Court ${court.court_number}`);
+                          }}
+                          title="Rename Court"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--color-umber-muted)',
+                            padding: '2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <IconPencil size={13} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <span style={{ fontSize: '0.75rem', color: 'var(--color-umber-muted)' }}>
                     ({court.assigned_match_type})
                   </span>
@@ -142,9 +228,32 @@ export function CourtZone({
               <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 {match ? (
                   <div>
+                    {/* Matchup Audit Warnings */}
+                    {auditMatchup(match, completedMatches, matches, playersMap).map((w, wIdx) => (
+                      <div
+                        key={wIdx}
+                        style={{
+                          marginBottom: '10px',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: w.severity === 'error' ? 'var(--color-alert-light)' : '#FFF3CD',
+                          border: `1px solid ${w.severity === 'error' ? 'var(--color-alert)' : '#FFEEBA'}`,
+                          color: w.severity === 'error' ? 'var(--color-alert-dark)' : '#856404',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <IconAlertTriangle size={14} style={{ flexShrink: 0 }} />
+                        <span>{w.message}</span>
+                      </div>
+                    ))}
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '10px', alignItems: 'center' }}>
                       {/* Team A Column */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                         <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-olive-dark)', textTransform: 'uppercase' }}>
                           Team A
                         </div>
@@ -154,18 +263,18 @@ export function CourtZone({
                             player={player}
                             isLockedPair={lockedPairIds.has(player.id)}
                             isOnDeck={false}
-                            onTap={(p) => onTapPlayer(p, false)}
+                            onTap={(p) => onTapPlayer(p, false, match.id, isSummoning || isNeedsAttention)}
                           />
                         ))}
                       </div>
 
                       {/* vs Divider */}
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-umber-subtle)' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-umber-subtle)', flexShrink: 0 }}>
                         vs
                       </div>
 
                       {/* Team B Column */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                         <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-olive-dark)', textTransform: 'uppercase' }}>
                           Team B
                         </div>
@@ -175,39 +284,11 @@ export function CourtZone({
                             player={player}
                             isLockedPair={lockedPairIds.has(player.id)}
                             isOnDeck={false}
-                            onTap={(p) => onTapPlayer(p, false)}
+                            onTap={(p) => onTapPlayer(p, false, match.id, isSummoning || isNeedsAttention)}
                           />
                         ))}
                       </div>
                     </div>
-
-                    {/* No-show selector when summoning or needs_attention */}
-                    {(isSummoning || isNeedsAttention) && (
-                      <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(62, 47, 35, 0.1)' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-umber-muted)', marginBottom: '4px' }}>
-                          Flag absent player:
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {[...teamAPlayers, ...teamBPlayers].map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => onNoShow(court.id, match.id, p.id)}
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '4px 8px',
-                                borderRadius: 'var(--radius-sm)',
-                                backgroundColor: 'var(--color-alert-light)',
-                                color: 'var(--color-alert-dark)',
-                                fontWeight: 600,
-                              }}
-                            >
-                              <IconUserX size={12} /> {p.name.split(' ')[0]} No-Show
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : nextOnDeckMatch ? (
                   <div

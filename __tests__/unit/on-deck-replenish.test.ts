@@ -26,4 +26,25 @@ describe('On-Deck Replenishment & Rating Baseline', () => {
     expect(computeOnDeckCap(4, 2)).toBe(2);
     expect(computeOnDeckCap(2, 4)).toBe(4);
   });
+
+  it('correctly constructs pairing history from completed matches', async () => {
+    const { buildPairingHistory } = await import('@/lib/engine/on-deck');
+    const mockCompletedMatches = [
+      {
+        stage: 'completed' as const,
+        team_a_ids: ['p1', 'p2'],
+        team_b_ids: ['p3', 'p4'],
+      },
+      {
+        stage: 'completed' as const,
+        team_a_ids: ['p1', 'p2'],
+        team_b_ids: ['p5', 'p6'],
+      },
+    ];
+
+    const history = buildPairingHistory(mockCompletedMatches);
+    // p1 & p2 played together twice
+    const key = 'p1' < 'p2' ? 'p1_p2' : 'p2_p1';
+    expect(history[key]).toBe(2);
+  });
 });

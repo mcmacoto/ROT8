@@ -46,15 +46,18 @@ export async function editPlayer(playerId: string, updates: PlayerEditInput) {
 }
 
 /**
- * Replaces a player in an on-deck match with a queued player.
- * SERVER-SIDE ENFORCEMENT: Strictly rejected if match stage is not 'on_deck'.
- * Active, summoning, in_match, result_pending, or completed matches cannot have players replaced (Elo-integrity guarantee).
+ * Replaces a player in an on-deck or summoning match with another player.
+ * Supports:
+ * - Direct replacement during both 'on_deck' and 'summoning' stages (Issue 4).
+ * - Drafting replacement from the queue OR another on-deck slot (Issue 5).
+ * - Placing the outgoing player into the Check-in / Holding list (Issue 10).
  */
-export async function replaceOnDeckPlayer(
+export async function replaceMatchPlayer(
   sessionId: string,
   matchId: string,
   outgoingPlayerId: string,
-  incomingPlayerId: string
+  incomingPlayerId: string,
+  options: { returnToHolding?: boolean } = {}
 ) {
   const supabase = await createClient();
 
@@ -70,13 +73,52 @@ export async function replaceOnDeckPlayer(
     throw new Error('Match not found');
   }
 
-  if (match.stage !== 'on_deck') {
+  if (match.stage !== 'on_deck' && match.stage !== 'summoning') {
     throw new Error(
-      `Player replacement is strictly forbidden on matches in stage '${match.stage}'. Full replacement is on-deck only for Elo integrity.`
+      `Player replacement is only permitted during on-deck or summoning stages. Current stage: '${match.stage}'.`
     );
   }
 
-  // 2. Determine team assignment
+  // 2. Fetch incoming player and verify eligibility
+  const { data: incomingPlayer, error: incomingError } = await supabase
+    .from('players')
+    .select('*')
+    .eq('id', incomingPlayerId)
+    .eq('session_id', sessionId)
+    .single();
+
+  if (incomingError || !incomingPlayer) {
+    throw new Error('Replacement player not found');
+  }
+
+  if (incomingPlayer.status === 'on_court') {
+    throw new Error('Cannot substitute a player who is currently active in a match.');
+  }
+
+  // If incoming player is currently staged in another match (Issue 5), vacate them from that donor match
+  const donorMatchId = incomingPlayer.staged_match_id;
+  if (donorMatchId && donorMatchId !== matchId) {
+    const { data: donorMatch } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', donorMatchId)
+      .single();
+
+    if (donorMatch && donorMatch.stage === 'on_deck') {
+      const newDonorA = (donorMatch.team_a_ids as string[]).filter((id: string) => id !== incomingPlayerId);
+      const newDonorB = (donorMatch.team_b_ids as string[]).filter((id: string) => id !== incomingPlayerId);
+
+      await supabase
+        .from('matches')
+        .update({
+          team_a_ids: newDonorA,
+          team_b_ids: newDonorB,
+        })
+        .eq('id', donorMatchId);
+    }
+  }
+
+  // 3. Determine team assignment
   let newTeamA = [...match.team_a_ids];
   let newTeamB = [...match.team_b_ids];
   let found = false;
@@ -93,20 +135,21 @@ export async function replaceOnDeckPlayer(
     throw new Error('Outgoing player is not part of this match');
   }
 
-  // 3. Update matches and player statuses in place (no audit log)
-  // Revert outgoing player to queued
+  // 4. Update outgoing player: default to 'checked_in' (Holding list) per Issue 10
+  const outgoingStatus = options.returnToHolding === false ? 'queued' : 'checked_in';
   await supabase
     .from('players')
-    .update({ status: 'queued', staged_match_id: null })
+    .update({ status: outgoingStatus, staged_match_id: null })
     .eq('id', outgoingPlayerId);
 
-  // Claim incoming player to staged
+  // 5. Update incoming player: staged or summoned matching the target match stage
+  const targetStatus = match.stage === 'summoning' ? 'summoned' : 'staged';
   await supabase
     .from('players')
-    .update({ status: 'staged', staged_match_id: matchId })
+    .update({ status: targetStatus, staged_match_id: matchId })
     .eq('id', incomingPlayerId);
 
-  // Update match team arrays
+  // 6. Update target match team arrays
   const { data: updatedMatch, error: updateError } = await supabase
     .from('matches')
     .update({
@@ -123,3 +166,5 @@ export async function replaceOnDeckPlayer(
 
   return updatedMatch;
 }
+
+export const replaceOnDeckPlayer = replaceMatchPlayer;

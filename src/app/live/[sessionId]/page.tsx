@@ -125,7 +125,7 @@ export default function MobilePlayerHubPage({
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         if (!ignore) loadData();
-      }, 150);
+      }, 300);
     };
 
     const channel = supabase
@@ -569,12 +569,12 @@ export default function MobilePlayerHubPage({
                 match &&
                 (match.team_a_ids.includes(currentPlayer.id) || match.team_b_ids.includes(currentPlayer.id));
 
-              const teamANames = match
-                ? match.team_a_ids.map((id) => playersMap.get(id)?.name || 'Player').join(' & ')
-                : '';
-              const teamBNames = match
-                ? match.team_b_ids.map((id) => playersMap.get(id)?.name || 'Player').join(' & ')
-                : '';
+              const teamAPlayers = match
+                ? (match.team_a_ids.map((id) => playersMap.get(id)).filter(Boolean) as Player[])
+                : [];
+              const teamBPlayers = match
+                ? (match.team_b_ids.map((id) => playersMap.get(id)).filter(Boolean) as Player[])
+                : [];
 
               return (
                 <div
@@ -588,8 +588,18 @@ export default function MobilePlayerHubPage({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-umber)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontWeight: 800,
+                          fontSize: '0.95rem',
+                          color: 'var(--color-umber)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={court.name || `Court ${court.court_number}`}
+                      >
                         {court.name || `Court ${court.court_number}`}
                       </span>
                     </div>
@@ -603,6 +613,7 @@ export default function MobilePlayerHubPage({
                           borderRadius: '10px',
                           fontSize: '0.7rem',
                           fontWeight: 700,
+                          flexShrink: 0,
                         }}
                       >
                         {match.stage === 'summoning' ? 'Grace Countdown' : 'In Progress'}
@@ -616,6 +627,7 @@ export default function MobilePlayerHubPage({
                           borderRadius: '10px',
                           fontSize: '0.7rem',
                           fontWeight: 600,
+                          flexShrink: 0,
                         }}
                       >
                         Available
@@ -624,15 +636,82 @@ export default function MobilePlayerHubPage({
                   </div>
 
                   {match ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                        <span style={{ color: 'var(--color-umber)' }}>{teamANames}</span>
-                        {match.score_a !== null && <span>{match.score_a}</span>}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
+                      {/* Team A */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                        {teamAPlayers.map((p) => {
+                          const isMe = currentPlayer && p.id === currentPlayer.id;
+                          return (
+                            <div
+                              key={p.id}
+                              style={{
+                                backgroundColor: isMe ? 'rgba(195, 111, 66, 0.12)' : 'var(--color-cream-light)',
+                                border: isMe ? '1px solid var(--color-terracotta)' : '1px solid rgba(62, 47, 35, 0.1)',
+                                padding: '4px 8px',
+                                borderRadius: 'var(--radius-sm)',
+                                minWidth: 0,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: '0.85rem',
+                                  fontWeight: isMe ? 800 : 600,
+                                  color: isMe ? 'var(--color-terracotta)' : 'var(--color-umber)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                                title={p.name}
+                              >
+                                {p.name}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-umber-muted)', textAlign: 'center' }}>vs</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                        <span style={{ color: 'var(--color-umber)' }}>{teamBNames}</span>
-                        {match.score_b !== null && <span>{match.score_b}</span>}
+
+                      {/* Score or VS */}
+                      <div style={{ textAlign: 'center', minWidth: '36px', flexShrink: 0 }}>
+                        {match.score_a !== null && match.score_b !== null ? (
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--color-umber)' }}>
+                            {match.score_a} - {match.score_b}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-umber-muted)' }}>VS</span>
+                        )}
+                      </div>
+
+                      {/* Team B */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                        {teamBPlayers.map((p) => {
+                          const isMe = currentPlayer && p.id === currentPlayer.id;
+                          return (
+                            <div
+                              key={p.id}
+                              style={{
+                                backgroundColor: isMe ? 'rgba(195, 111, 66, 0.12)' : 'var(--color-cream-light)',
+                                border: isMe ? '1px solid var(--color-terracotta)' : '1px solid rgba(62, 47, 35, 0.1)',
+                                padding: '4px 8px',
+                                borderRadius: 'var(--radius-sm)',
+                                minWidth: 0,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: '0.85rem',
+                                  fontWeight: isMe ? 800 : 600,
+                                  color: isMe ? 'var(--color-terracotta)' : 'var(--color-umber)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                                title={p.name}
+                              >
+                                {p.name}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : (
@@ -658,8 +737,8 @@ export default function MobilePlayerHubPage({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {onDeckMatches.map((m) => {
-                const teamA = m.team_a_ids.map((id) => playersMap.get(id)?.name || 'Player').join(' & ');
-                const teamB = m.team_b_ids.map((id) => playersMap.get(id)?.name || 'Player').join(' & ');
+                const teamAPlayers = m.team_a_ids.map((id) => playersMap.get(id)).filter(Boolean) as Player[];
+                const teamBPlayers = m.team_b_ids.map((id) => playersMap.get(id)).filter(Boolean) as Player[];
                 const isMyMatch =
                   currentPlayer && (m.team_a_ids.includes(currentPlayer.id) || m.team_b_ids.includes(currentPlayer.id));
 
@@ -671,34 +750,100 @@ export default function MobilePlayerHubPage({
                       borderRadius: 'var(--radius-md)',
                       border: isMyMatch ? '2px solid var(--color-terracotta)' : '1px solid rgba(62, 47, 35, 0.12)',
                       padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       boxShadow: 'var(--shadow-sm)',
                     }}
                   >
-                    <div>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          backgroundColor: 'rgba(195, 111, 66, 0.12)',
-                          color: 'var(--color-terracotta)',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        Slot #{m.on_deck_slot_number || 1}
-                      </span>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-umber)', marginTop: '4px' }}>
-                        {teamA} <span style={{ color: 'var(--color-umber-muted)', fontWeight: 400 }}>vs</span> {teamB}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            backgroundColor: 'rgba(195, 111, 66, 0.12)',
+                            color: 'var(--color-terracotta)',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          Slot #{m.on_deck_slot_number || 1}
+                        </span>
+                        {isMyMatch && (
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-terracotta)' }}>
+                            You&apos;re Up Next!
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', alignItems: 'center' }}>
+                        {/* Team A */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                          {teamAPlayers.map((p) => {
+                            const isMe = currentPlayer && p.id === currentPlayer.id;
+                            return (
+                              <div
+                                key={p.id}
+                                style={{
+                                  backgroundColor: isMe ? 'rgba(195, 111, 66, 0.12)' : 'var(--color-cream-light)',
+                                  border: isMe ? '1px solid var(--color-terracotta)' : '1px solid rgba(62, 47, 35, 0.1)',
+                                  padding: '4px 8px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  minWidth: 0,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: isMe ? 800 : 600,
+                                    color: isMe ? 'var(--color-terracotta)' : 'var(--color-umber)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                  title={p.name}
+                                >
+                                  {p.name}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--color-umber-muted)', flexShrink: 0 }}>VS</span>
+
+                        {/* Team B */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                          {teamBPlayers.map((p) => {
+                            const isMe = currentPlayer && p.id === currentPlayer.id;
+                            return (
+                              <div
+                                key={p.id}
+                                style={{
+                                  backgroundColor: isMe ? 'rgba(195, 111, 66, 0.12)' : 'var(--color-cream-light)',
+                                  border: isMe ? '1px solid var(--color-terracotta)' : '1px solid rgba(62, 47, 35, 0.1)',
+                                  padding: '4px 8px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  minWidth: 0,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: isMe ? 800 : 600,
+                                    color: isMe ? 'var(--color-terracotta)' : 'var(--color-umber)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                  title={p.name}
+                                >
+                                  {p.name}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                    {isMyMatch && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-terracotta)' }}>
-                        You&apos;re Up Next!
-                      </span>
-                    )}
                   </div>
                 );
               })}

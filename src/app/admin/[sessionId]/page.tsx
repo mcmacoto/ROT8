@@ -49,6 +49,7 @@ export default function AdminConsolePage({
     player: Player;
     isOnDeck: boolean;
     matchId?: string;
+    isSummoning?: boolean;
   } | null>(null);
 
   const [activeScoreModal, setActiveScoreModal] = useState<{
@@ -132,7 +133,7 @@ export default function AdminConsolePage({
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         if (!ignore) loadData();
-      }, 150);
+      }, 300);
     };
 
     // Supabase Realtime subscriptions
@@ -213,6 +214,41 @@ export default function AdminConsolePage({
   const checkedInPlayers = players.filter((p) => p.status === 'checked_in');
   const availableCourts = courts.filter((c) => c.status === 'available');
   const completedMatches = matches.filter((m) => m.stage === 'completed');
+
+  // Candidate pool for immediate substitution (Queue + players in other on-deck slots)
+  const replacementCandidates = React.useMemo(() => {
+    if (!selectedPlayerForEdit) return [];
+    const currentMatchId = selectedPlayerForEdit.matchId;
+    const currentId = selectedPlayerForEdit.player.id;
+
+    const candidates: { id: string; name: string; info: string }[] = [];
+
+    // 1. Queued players
+    players
+      .filter((p) => p.status === 'queued' && p.id !== currentId)
+      .forEach((p) => {
+        candidates.push({
+          id: p.id,
+          name: p.name,
+          info: 'Queue',
+        });
+      });
+
+    // 2. Players staged in another on-deck match (Cross-matchup drafting - Issue 5)
+    players
+      .filter((p) => p.status === 'staged' && p.staged_match_id && p.staged_match_id !== currentMatchId && p.id !== currentId)
+      .forEach((p) => {
+        const donorMatch = matches.find((m) => m.id === p.staged_match_id);
+        const slotLabel = donorMatch?.on_deck_slot_number ? `Slot #${donorMatch.on_deck_slot_number}` : 'Other On-Deck';
+        candidates.push({
+          id: p.id,
+          name: p.name,
+          info: `On-Deck (${slotLabel})`,
+        });
+      });
+
+    return candidates;
+  }, [players, matches, selectedPlayerForEdit]);
 
   // Handlers
   const handleStartMatch = async (courtId: string, matchId: string) => {
@@ -473,9 +509,23 @@ export default function AdminConsolePage({
     loadData();
   };
 
-  const handleReplaceOnDeck = async (outgoingPlayerId: string, incomingPlayerId: string) => {
+  const handleRenameCourt = async (courtId: string, newName: string) => {
+    const res = await fetch(`/api/admin/${sessionId}/courts`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ courtId, name: newName }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to rename court' }));
+      alert(err.error || 'Failed to rename court');
+      return;
+    }
+    loadData();
+  };
+
+  const handleReplacePlayer = async (outgoingPlayerId: string, incomingPlayerId: string) => {
     if (!selectedPlayerForEdit?.matchId) return;
-    const res = await fetch(`/api/admin/${sessionId}/on-deck`, {
+    const res = await fetch(`/api/admin/${sessionId}/matches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -699,12 +749,16 @@ export default function AdminConsolePage({
           playersMap={playersMap}
           lockedPairIds={lockedPairIds}
           hasOnDeckSlots={onDeckMatches.length > 0}
-          onTapPlayer={(player) => setSelectedPlayerForEdit({ player, isOnDeck: false })}
+          completedMatches={completedMatches}
+          onTapPlayer={(player, isOnDeck, matchId, isSummoning) =>
+            setSelectedPlayerForEdit({ player, isOnDeck: isOnDeck ?? false, matchId, isSummoning })
+          }
           onStartMatch={handleStartMatch}
           onCompleteMatch={handleCompleteMatchPrompt}
           onNoShow={handleNoShow}
           onDirectDispatch={handleDirectDispatch}
           onCallOnDeckToCourt={handleCallOnDeckToCourt}
+          onRenameCourt={handleRenameCourt}
         />
 
         {/* Zone 2: On-Deck Matchups */}
@@ -715,6 +769,8 @@ export default function AdminConsolePage({
           capFormula={capFormula}
           playersMap={playersMap}
           lockedPairIds={lockedPairIds}
+          completedMatches={completedMatches}
+          allMatches={matches}
           onTapPlayer={(player) => {
             const m = onDeckMatches.find(
               (match) => match.team_a_ids.includes(player.id) || match.team_b_ids.includes(player.id)
@@ -761,11 +817,13 @@ export default function AdminConsolePage({
         player={selectedPlayerForEdit?.player || null}
         joinPin={session.join_pin}
         isOnDeck={selectedPlayerForEdit?.isOnDeck || false}
+        isSummoning={selectedPlayerForEdit?.isSummoning || false}
         isLockedPair={selectedPlayerForEdit ? lockedPairIds.has(selectedPlayerForEdit.player.id) : false}
         queuedPlayers={queuedPlayers}
+        replacementCandidates={replacementCandidates}
         onClose={() => setSelectedPlayerForEdit(null)}
         onSaveEdits={handleSaveEdits}
-        onReplace={handleReplaceOnDeck}
+        onReplace={handleReplacePlayer}
         onRetireForfeit={handleRetireForfeitPrompt}
         onDissolvePair={handleDissolvePair}
         onCheckoutPlayer={handleCheckoutPlayer}

@@ -4,6 +4,7 @@ import React from 'react';
 import { Match, Player } from '@/types/database';
 import { PlayerCard } from './PlayerCard';
 import { StalledSlot } from '@/lib/engine/on-deck';
+import { auditMatchup } from '@/lib/engine/matchmaking/matchup-audit';
 import { IconRefresh, IconArrowUpRight, IconAlertTriangle } from '@tabler/icons-react';
 
 interface OnDeckZoneProps {
@@ -13,6 +14,8 @@ interface OnDeckZoneProps {
   capFormula: string;
   playersMap: Map<string, Player>;
   lockedPairIds: Set<string>;
+  completedMatches?: Match[];
+  allMatches?: Match[];
   onTapPlayer: (player: Player, isOnDeck: boolean) => void;
   onCallToCourt: (slotNumber: number, matchId: string) => void;
   onReroll: (matchId: string) => Promise<void>;
@@ -27,6 +30,8 @@ export function OnDeckZone({
   capFormula,
   playersMap,
   lockedPairIds,
+  completedMatches = [],
+  allMatches = [],
   onTapPlayer,
   onCallToCourt,
   onReroll,
@@ -64,6 +69,10 @@ export function OnDeckZone({
             : [];
           const teamBPlayers = match
             ? (match.team_b_ids.map((id) => playersMap.get(id)).filter(Boolean) as Player[])
+            : [];
+
+          const warnings = match
+            ? auditMatchup(match, completedMatches, allMatches, playersMap)
             : [];
 
           return (
@@ -123,6 +132,51 @@ export function OnDeckZone({
                 )}
               </div>
 
+              {/* Matchup Audit Warnings (Issue 11) */}
+              {warnings.map((w, wIdx) => (
+                <div
+                  key={wIdx}
+                  style={{
+                    margin: '8px 12px 0',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: w.severity === 'error' ? 'var(--color-alert-light)' : '#FFF3CD',
+                    border: `1px solid ${w.severity === 'error' ? 'var(--color-alert)' : '#FFEEBA'}`,
+                    color: w.severity === 'error' ? 'var(--color-alert-dark)' : '#856404',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <IconAlertTriangle size={14} style={{ flexShrink: 0 }} />
+                    <span>{w.message}</span>
+                  </div>
+                  {match && (
+                    <button
+                      type="button"
+                      onClick={() => onReroll(match.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'inherit',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '0 4px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      Reroll
+                    </button>
+                  )}
+                </div>
+              ))}
+
               {/* Slot Body */}
               <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 {stalled ? (
@@ -175,7 +229,7 @@ export function OnDeckZone({
                 ) : match ? (
                   /* Normal Composed Match */
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-olive-dark)', textTransform: 'uppercase' }}>
                         Team A
                       </div>
@@ -190,11 +244,11 @@ export function OnDeckZone({
                       ))}
                     </div>
 
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-umber-subtle)' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-umber-subtle)', flexShrink: 0 }}>
                       vs
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                       <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-olive-dark)', textTransform: 'uppercase' }}>
                         Team B
                       </div>

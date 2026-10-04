@@ -22,7 +22,14 @@ export function findSocialMatch(
   wWait = 1.0,
   wRepeat = 50.0
 ): MatchCandidate | null {
-  if (eligiblePlayers.length < 4) return null;
+  // Deduplicate candidate players by id
+  const seenIds = new Set<string>();
+  const uniqueEligible = eligiblePlayers.filter((p) => {
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+    return true;
+  });
+  if (uniqueEligible.length < 4) return null;
 
   // Build lookup of locked pairs
   const pairMap = new Map<string, string>();
@@ -33,7 +40,7 @@ export function findSocialMatch(
 
   // Sort candidates by wait time (longest waiting first)
   const now = Date.now();
-  const pool = [...eligiblePlayers].sort(
+  const pool = [...uniqueEligible].sort(
     (a, b) => new Date(a.wait_started_at).getTime() - new Date(b.wait_started_at).getTime()
   );
 
@@ -48,6 +55,7 @@ export function findSocialMatch(
       for (let k = j + 1; k < candidatePool.length - 1; k++) {
         for (let l = k + 1; l < candidatePool.length; l++) {
           const group = [candidatePool[i], candidatePool[j], candidatePool[k], candidatePool[l]];
+          if (new Set(group.map((p) => p.id)).size !== 4) continue;
 
           // Verify pair lock integrity
           const isValidPairGrouping = group.every((player) => {

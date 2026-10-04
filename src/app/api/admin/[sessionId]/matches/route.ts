@@ -7,6 +7,7 @@ import { calculateEloUpdates } from '@/lib/engine/matchmaking/elo-rated';
 import { triggerAutoDispatchIfEligible } from '@/lib/engine/auto-dispatch';
 import { composeOnDeckSlot, fillAvailableOnDeckSlots } from '@/lib/engine/on-deck';
 import { syncLockedPairsElo } from '@/lib/engine/locked-pair-dissolution';
+import { replaceMatchPlayer } from '@/lib/db/player-edit';
 
 export async function POST(
   request: NextRequest,
@@ -88,7 +89,19 @@ export async function POST(
     return NextResponse.json({ success: true });
   }
 
-  // Action: "no_show" (flags absent player, drafts replacement in <500ms, restarts grace period)
+  // Action: "replace_player" (Direct immediate replacement during summoning or on-deck)
+  if (action === 'replace_player') {
+    try {
+      const { outgoingPlayerId, incomingPlayerId } = body;
+      const result = await replaceMatchPlayer(sessionId, matchId, outgoingPlayerId, incomingPlayerId);
+      return NextResponse.json(result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Player replacement failed';
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
+
+  // Action: "no_show" (Deprecated - retained for API stability)
   if (action === 'no_show') {
     try {
       const result = await handleNoShowRedraft(sessionId, matchId, noShowPlayerId);

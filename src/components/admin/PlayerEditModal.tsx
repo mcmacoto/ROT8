@@ -6,13 +6,21 @@ import { RATING_TIERS, formatRating } from '@/lib/utils/rating-labels';
 import { getPlayerPin } from '@/lib/utils/player-pin';
 import { IconX, IconCheck, IconTrash, IconUserX, IconRefresh, IconLinkOff } from '@tabler/icons-react';
 
+export interface ReplacementOption {
+  id: string;
+  name: string;
+  info: string;
+}
+
 interface PlayerEditModalProps {
   isOpen: boolean;
   player: Player | null;
   joinPin?: string;
-  isOnDeck: boolean; // true if in on-deck slot, false if on active court or in queue/holding/resting
+  isOnDeck: boolean; // true if in on-deck slot
+  isSummoning?: boolean; // true if on active court in summoning stage (Issue 4)
   isLockedPair: boolean;
-  queuedPlayers?: Player[]; // for on-deck replacement selection
+  queuedPlayers?: Player[]; // for backwards compatibility
+  replacementCandidates?: ReplacementOption[]; // queue + cross-match on-deck candidates (Issue 5)
   onClose: () => void;
   onSaveEdits: (playerId: string, name: string, rating: StaticRating) => Promise<void>;
   onReplace?: (outgoingPlayerId: string, incomingPlayerId: string) => Promise<void>;
@@ -26,8 +34,10 @@ export function PlayerEditModal({
   player,
   joinPin,
   isOnDeck,
+  isSummoning = false,
   isLockedPair,
   queuedPlayers = [],
+  replacementCandidates,
   onClose,
   onSaveEdits,
   onReplace,
@@ -87,7 +97,11 @@ export function PlayerEditModal({
 
   const handleRemove = async () => {
     if (!onCheckoutPlayer) return;
-    if (window.confirm(`Remove ${player.name} from the session rotation?`)) {
+    const isAlreadyHolding = player.status === 'checked_in';
+    const confirmMsg = isAlreadyHolding
+      ? `Permanently remove ${player.name} from this session?`
+      : `Move ${player.name} back to the Check-in / Holding List?`;
+    if (window.confirm(confirmMsg)) {
       try {
         setIsSubmitting(true);
         await onCheckoutPlayer(player.id);
@@ -118,7 +132,9 @@ export function PlayerEditModal({
 
   // Status label
   const statusLabel =
-    player.status === 'on_court'
+    isSummoning
+      ? 'Court Summoning (Waiting for Players)'
+      : player.status === 'on_court'
       ? 'Active Court'
       : isOnDeck
       ? 'On-Deck Slot'
@@ -351,8 +367,8 @@ export function PlayerEditModal({
               </button>
             )}
 
-            {/* On-Deck: Replace Player Selector */}
-            {isOnDeck && onReplace && (
+            {/* On-Deck & Summoning: Replace Player Selector (Issue 4 & Issue 5) */}
+            {(isOnDeck || isSummoning) && onReplace && (
               <div>
                 {!showReplaceSelector ? (
                   <button
@@ -374,12 +390,12 @@ export function PlayerEditModal({
                       cursor: 'pointer',
                     }}
                   >
-                    <IconRefresh size={16} /> Replace in On-Deck (Draft from Queue)
+                    <IconRefresh size={16} /> Substitute / Replace Player
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-olive-dark)' }}>
-                      Select replacement from queue:
+                      Select replacement player (from queue or other on-deck slot):
                     </label>
                     <select
                       value={selectedReplacementId}
@@ -392,11 +408,21 @@ export function PlayerEditModal({
                       }}
                     >
                       <option value="">-- Choose replacement --</option>
-                      {queuedPlayers.map((qp) => (
-                        <option key={qp.id} value={qp.id}>
-                          {qp.name} ({formatRating(qp.static_rating)})
-                        </option>
-                      ))}
+                      {replacementCandidates && replacementCandidates.length > 0
+                        ? replacementCandidates
+                            .filter((c) => c.id !== player.id)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} — {c.info}
+                              </option>
+                            ))
+                        : queuedPlayers
+                            .filter((qp) => qp.id !== player.id)
+                            .map((qp) => (
+                              <option key={qp.id} value={qp.id}>
+                                {qp.name} ({formatRating(qp.static_rating)})
+                              </option>
+                            ))}
                     </select>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
@@ -462,7 +488,10 @@ export function PlayerEditModal({
                   cursor: 'pointer',
                 }}
               >
-                <IconTrash size={16} /> Remove / Checkout Player
+                <IconTrash size={16} />{' '}
+                {player.status === 'checked_in'
+                  ? 'Remove Permanently from Session'
+                  : 'Move to Check-in / Holding List'}
               </button>
             )}
           </div>
